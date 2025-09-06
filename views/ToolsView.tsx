@@ -5,6 +5,7 @@ import { TOOLS } from '../constants';
 import { useLocalization } from '../hooks/useLocalization';
 import ToolCard from '../components/ToolCard';
 import ToolRunnerView from './ToolRunnerView';
+import { isGeminiAvailable } from '../services/geminiService';
 
 const ToolsView: React.FC = () => {
   const { t } = useLocalization();
@@ -31,6 +32,27 @@ const ToolsView: React.FC = () => {
   
   if (selectedTool) {
     return <ToolRunnerView tool={selectedTool} onBack={handleBack} />;
+  }
+
+  if (!isGeminiAvailable) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold mb-6">{t('tools')}</h1>
+        <div className="bg-orange-100 dark:bg-orange-900/50 border-l-4 border-orange-500 text-orange-800 dark:text-orange-200 p-4 rounded-md" role="alert">
+          <div className="flex">
+            <div className="py-1"><i className="fa-solid fa-triangle-exclamation text-xl mr-3 text-orange-500"></i></div>
+            <div>
+              <p className="font-bold">AI Service Unavailable / خدمة الذكاء الاصطناعي غير متاحة</p>
+              <p className="text-sm mt-1">
+                The AI features are disabled because the API key is not configured. The administrator must set the `API_KEY` environment variable in the deployment settings.
+                <br />
+                ميزات الذكاء الاصطناعي معطلة لعدم وجود مفتاح API. يجب على المسؤول إعداد متغير البيئة `API_KEY` في إعدادات النشر.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

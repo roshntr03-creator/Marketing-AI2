@@ -1,13 +1,13 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { GeneratedContentData, Language } from "../types";
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set.");
-}
+export const isGeminiAvailable = !!process.env.API_KEY;
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = isGeminiAvailable ? new GoogleGenAI({ apiKey: process.env.API_KEY as string }) : null;
 const textModel = 'gemini-2.5-flash';
 const groundedTools = ['seo_assistant', 'influencer_discovery', 'social_media_optimizer'];
+
+const UNAVAILABLE_ERROR = "AI Service is not configured. The API_KEY environment variable is missing.";
 
 const responseSchema = {
     type: Type.OBJECT,
@@ -186,6 +186,10 @@ export const generateContentForTool = async (
     language: Language,
     onRetry: (delaySeconds: number) => void
 ): Promise<GeneratedContentData> => {
+    if (!isGeminiAvailable || !ai) {
+        throw new Error(UNAVAILABLE_ERROR);
+    }
+
     const textInputs: Record<string, string> = {};
     const imageParts: any[] = [];
     
@@ -237,6 +241,10 @@ export const generateVideo = async (
     onStatusUpdate: (status: string) => void,
     onRetry: (delaySeconds: number) => void
 ): Promise<string> => {
+    if (!isGeminiAvailable || !ai) {
+        throw new Error(UNAVAILABLE_ERROR);
+    }
+
     onStatusUpdate('generating_video');
 
     const videoPrompt = language === 'ar'
