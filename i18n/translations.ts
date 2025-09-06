@@ -95,6 +95,11 @@ const translations = {
     'tip_content': 'Regularly posting high-quality content builds trust and keeps your audience engaged. Plan your content calendar to stay consistent across all your platforms.',
     'api_unavailable_title': 'AI Service Unavailable',
     'api_unavailable_body': 'The AI features are disabled because the API key is not configured. The administrator must set the `API_KEY` environment variable in the deployment settings.',
+
+    // Settings & Troubleshooting
+    'troubleshooting': 'Troubleshooting',
+    'api_key_help_title': 'Why are AI features disabled?',
+    'api_key_help_content': 'This application requires a Google AI API key to function. For security, this key must be set as an environment variable named `API_KEY` by the administrator in the server or deployment settings. If you are seeing an error about a missing key, please contact your administrator to ensure it has been configured correctly. Storing keys directly in the app is insecure, which is why this secure method is used.',
   },
   ar: {
     // General
@@ -192,6 +197,11 @@ const translations = {
     'tip_content': 'نشر محتوى عالي الجودة بانتظام يبني الثقة ويحافظ على تفاعل جمهورك. خطط لتقويم المحتوى الخاص بك للحفاظ على الاستمرارية عبر جميع منصاتك.',
     'api_unavailable_title': 'خدمة الذكاء الاصطناعي غير متاحة',
     'api_unavailable_body': 'ميزات الذكاء الاصطناعي معطلة لعدم وجود مفتاح API. يجب على المسؤول إعداد متغير البيئة `API_KEY` في إعدادات النشر.',
+    
+    // Settings & Troubleshooting
+    'troubleshooting': 'استكشاف الأخطاء وإصلاحها',
+    'api_key_help_title': 'لماذا ميزات الذكاء الاصطناعي معطلة؟',
+    'api_key_help_content': 'يتطلب هذا التطبيق مفتاح API الخاص بـ Google AI ليعمل. للأمان، يجب تعيين هذا المفتاح كمتغير بيئة باسم `API_KEY` بواسطة المسؤول في إعدادات الخادم أو النشر. إذا كنت ترى خطأً بشأن مفتاح مفقود، يرجى الاتصال بالمسؤول للتأكد من تكوينه بشكل صحيح. تخزين المفاتيح مباشرة في التطبيق غير آمن، ولهذا السبب يتم استخدام هذه الطريقة الآمنة.',
   }
 };
 
