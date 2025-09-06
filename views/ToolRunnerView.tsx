@@ -70,6 +70,15 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
     e.preventDefault();
     triggerHapticFeedback();
     
+    if (tool.id === 'short_form_factory') {
+        const hasText = inputs.source_text && typeof inputs.source_text === 'string' && inputs.source_text.trim() !== '';
+        const hasImage = inputs.image && inputs.image instanceof File;
+        if (!hasText && !hasImage) {
+            setError(t('short_form_factory_error'));
+            return;
+        }
+    }
+
     // Revoke previous blob URL before starting a new request
     if (videoUrl) {
         URL.revokeObjectURL(videoUrl);

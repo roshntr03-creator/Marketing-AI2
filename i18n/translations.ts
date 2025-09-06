@@ -80,6 +80,7 @@ const translations = {
     'view_sources': 'View Sources',
     'sources': 'Sources',
     'close': 'Close',
+    'short_form_factory_error': 'Please provide either long-form content or upload a product image.',
 
     // Video Generation Status
     'generating_video': 'Generating video... This may take a few minutes.',
@@ -92,6 +93,8 @@ const translations = {
     'marketing_tip': 'Marketing Tip of the Day',
     'tip_title': 'Consistency is Key',
     'tip_content': 'Regularly posting high-quality content builds trust and keeps your audience engaged. Plan your content calendar to stay consistent across all your platforms.',
+    'api_unavailable_title': 'AI Service Unavailable',
+    'api_unavailable_body': 'The AI features are disabled because the API key is not configured. The administrator must set the `API_KEY` environment variable in the deployment settings.',
   },
   ar: {
     // General
@@ -174,6 +177,7 @@ const translations = {
     'view_sources': 'عرض المصادر',
     'sources': 'المصادر',
     'close': 'إغلاق',
+    'short_form_factory_error': 'يرجى تقديم محتوى طويل أو رفع صورة منتج.',
 
     // Video Generation Status
     'generating_video': 'جاري إنشاء الفيديو... قد يستغرق هذا بضع دقائق.',
@@ -186,6 +190,8 @@ const translations = {
     'marketing_tip': 'نصيحة اليوم في التسويق',
     'tip_title': 'الاستمرارية هي المفتاح',
     'tip_content': 'نشر محتوى عالي الجودة بانتظام يبني الثقة ويحافظ على تفاعل جمهورك. خطط لتقويم المحتوى الخاص بك للحفاظ على الاستمرارية عبر جميع منصاتك.',
+    'api_unavailable_title': 'خدمة الذكاء الاصطناعي غير متاحة',
+    'api_unavailable_body': 'ميزات الذكاء الاصطناعي معطلة لعدم وجود مفتاح API. يجب على المسؤول إعداد متغير البيئة `API_KEY` في إعدادات النشر.',
   }
 };
 

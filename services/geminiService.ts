@@ -1,9 +1,12 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { GeneratedContentData, Language } from "../types";
 
-export const isGeminiAvailable = !!process.env.API_KEY;
+// Safely check for the API key in a way that works in any JS environment
+const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : undefined;
 
-const ai = isGeminiAvailable ? new GoogleGenAI({ apiKey: process.env.API_KEY as string }) : null;
+export const isGeminiAvailable = !!apiKey;
+
+const ai = isGeminiAvailable ? new GoogleGenAI({ apiKey: apiKey as string }) : null;
 const textModel = 'gemini-2.5-flash';
 const groundedTools = ['seo_assistant', 'influencer_discovery', 'social_media_optimizer'];
 
@@ -101,7 +104,7 @@ const getGroundedPrompt = (toolId: string, inputs: Record<string, string>, langu
     return { prompt, title };
 };
 
-const getJsonPrompt = (toolId: string, inputs: Record<string, string>, language: Language): string => {
+const getJsonPrompt = (toolId: string, inputs: Record<string, string>, language: Language, hasImage: boolean): string => {
     const isArabic = language === 'ar';
     const systemInstruction = isArabic
         ? `أنت مساعد تسويق خبير. هدفك هو تقديم محتوى موجز وعملي ومبتكر بناءً على طلب المستخدم. قم دائمًا بإرجاع الاستجابة بتنسيق JSON المطلوب، باتباع المخطط المقدم. يجب أن تكون الاستجابة بالكامل باللغة العربية.`
@@ -110,21 +113,22 @@ const getJsonPrompt = (toolId: string, inputs: Record<string, string>, language:
     let userPrompt = '';
 
     switch (toolId) {
-        // Fix: Added case for 'video_script_assistant' which was missing, causing a runtime error.
         case 'video_script_assistant':
             userPrompt = isArabic
                 ? `اكتب نص فيديو مفصل بناءً على الفكرة التالية: "${inputs.idea}". يجب أن يتضمن النص أقسامًا للمقدمة، والمحتوى الرئيسي (مقسم إلى مشاهد أو نقاط رئيسية)، والخاتمة مع دعوة لاتخاذ إجراء. قم بتضمين اقتراحات للمرئيات أو الإجراءات على الشاشة.`
                 : `Write a detailed video script based on the following idea: "${inputs.idea}". The script should include sections for an introduction, the main content (broken down into scenes or key points), and an outro with a call to action. Include suggestions for visuals or on-screen actions.`;
             break;
         case 'short_form_factory':
-            if (inputs.source_text) {
+            if (inputs.source_text && inputs.source_text.trim() !== '') {
                 userPrompt = isArabic
                     ? `حوّل المحتوى الطويل التالي إلى 3 أفكار لمقاطع فيديو قصيرة. لكل فكرة، قدم عنوانًا جذابًا، ومفهومًا موجزًا، ومرئيًا مقترحًا. المحتوى: "${inputs.source_text}"`
                     : `Transform the following long-form content into 3 short-form video ideas. For each idea, provide a catchy title, a brief concept, and a suggested visual. Content: "${inputs.source_text}"`;
-            } else {
+            } else if (hasImage) {
                  userPrompt = isArabic
                     ? `حلل صورة المنتج المقدمة وأنشئ 3 أفكار لمقاطع فيديو قصيرة للترويج لها. لكل فكرة، قدم عنوانًا جذابًا، ومفهومًا موجزًا، ومرئيًا مقترحًا.`
                     : `Analyze the provided product image and generate 3 short-form video ideas to promote it. For each idea, provide a catchy title, a brief concept, and a suggested visual.`;
+            } else {
+                 throw new Error(isArabic ? "يرجى تقديم محتوى طويل أو تحميل صورة." : "Please provide either long-form content or upload an image.");
             }
             break;
         case 'smm_content_plan':
@@ -191,14 +195,14 @@ export const generateContentForTool = async (
     }
 
     const textInputs: Record<string, string> = {};
-    const imageParts: any[] = [];
+    const fileInputs: File[] = [];
     
     for(const key in inputs) {
-        if(typeof inputs[key] === 'string') {
-            textInputs[key] = inputs[key] as string;
-        } else if (inputs[key] instanceof File) {
-            const imagePart = await fileToGenerativePart(inputs[key] as File);
-            imageParts.push(imagePart);
+        const value = inputs[key];
+        if(typeof value === 'string') {
+            textInputs[key] = value;
+        } else if (value instanceof File) {
+            fileInputs.push(value);
         }
     }
     
@@ -219,8 +223,10 @@ export const generateContentForTool = async (
             return generatedData;
         }
 
-        const prompt = getJsonPrompt(toolId, textInputs, language);
-        const contents: any = { parts: [{ text: prompt }, ...imageParts] };
+        const imageParts = await Promise.all(fileInputs.map(fileToGenerativePart));
+        const prompt = getJsonPrompt(toolId, textInputs, language, imageParts.length > 0);
+        const contents = { parts: [{ text: prompt }, ...imageParts] };
+
         const response = await ai.models.generateContent({
             model: textModel,
             contents: contents,
@@ -275,7 +281,7 @@ export const generateVideo = async (
     
     // Fetch the video data and create a blob URL
     const fetchVideoApiCall = async () => {
-        const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+        const response = await fetch(`${downloadLink}&key=${apiKey}`);
         if (!response.ok) {
             throw new Error(`Failed to fetch video: ${response.statusText}`);
         }
