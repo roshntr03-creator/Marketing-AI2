@@ -29,6 +29,27 @@ export interface GeneratedContentData {
   sources?: { uri: string; title: string }[];
 }
 
+export interface Generation {
+  id: string;
+  created_at: string;
+  tool_id: string;
+  inputs: Record<string, string | File>;
+  output: GeneratedContentData;
+}
+
+export type ToastType = 'success' | 'error' | 'info';
+
+export interface Toast {
+  id: number;
+  message: string;
+  type: ToastType;
+}
+
+export interface ToastContextType {
+  addToast: (message: string, type: ToastType) => void;
+}
+
+
 // Re-exporting Supabase types for consistent imports
 export type { User };
 

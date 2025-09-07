@@ -6,6 +6,10 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import SkeletonLoader from '../components/SkeletonLoader';
 import GeneratedContent from '../components/GeneratedContent';
 import { triggerHapticFeedback } from '../lib/haptics';
+import { supabase } from '../lib/supabaseClient';
+import { useToasts } from '../hooks/useToasts';
+import { useAuth } from '../hooks/useAuth';
+
 
 interface ToolRunnerViewProps {
   tool: Tool;
@@ -14,6 +18,8 @@ interface ToolRunnerViewProps {
 
 const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
   const { t, language } = useLocalization();
+  const { addToast } = useToasts();
+  const { user } = useAuth();
   const [inputs, setInputs] = useState<Record<string, string | File>>({});
   const [imagePreview, setImagePreview] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -23,14 +29,33 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
   const [status, setStatus] = useState('');
 
   useEffect(() => {
-    // Cleanup function: This runs when the component unmounts or when videoUrl changes.
-    // It revokes the object URL to free up browser memory.
     return () => {
       if (videoUrl) {
         URL.revokeObjectURL(videoUrl);
       }
     };
   }, [videoUrl]);
+  
+  const saveGeneration = async (output: GeneratedContentData | string) => {
+    if (!user) return;
+    
+    // We don't save the file object itself, just the text inputs
+    const textInputs = Object.fromEntries(
+        Object.entries(inputs).filter(([, value]) => typeof value === 'string')
+    );
+
+    const { error } = await supabase.from('generations').insert({
+      user_id: user.id,
+      tool_id: tool.id,
+      inputs: textInputs,
+      output: output,
+    });
+    
+    if (error) {
+        console.error('Failed to save generation:', error);
+    }
+  };
+
 
   const handleInputChange = (name: string, value: string) => {
     setInputs(prev => ({ ...prev, [name]: value }));
@@ -79,7 +104,6 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
         }
     }
 
-    // Revoke previous blob URL before starting a new request
     if (videoUrl) {
         URL.revokeObjectURL(videoUrl);
     }
@@ -96,9 +120,12 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
         if (!prompt) throw new Error("Prompt is required for video generation.");
         const resultUrl = await generateVideo(prompt, language, onVideoStatusUpdate, onRetry);
         setVideoUrl(resultUrl);
+        addToast(t('video_gen_complete_toast'), 'success');
+        saveGeneration(prompt); // Save the prompt for video
       } else {
         const result = await generateContentForTool(tool.id, inputs, language, onRetry);
         setGeneratedContent(result);
+        saveGeneration(result);
       }
     } catch (err: any) {
       setError(err.message || t('error_generating'));

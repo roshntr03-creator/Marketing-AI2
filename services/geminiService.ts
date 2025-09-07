@@ -268,7 +268,8 @@ export const generateVideo = async (
 
     onStatusUpdate('processing_video');
     
-    let polledOperation = operation;
+    // Fix: Type polledOperation as `any` to handle the untyped response from the video generation API.
+    let polledOperation: any = operation;
     while (!polledOperation.done) {
       await new Promise(resolve => setTimeout(resolve, 10000));
       polledOperation = await ai.operations.getVideosOperation({ operation: polledOperation });

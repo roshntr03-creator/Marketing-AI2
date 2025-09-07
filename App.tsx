@@ -10,9 +10,9 @@ import AnalyticsView from './views/AnalyticsView';
 import SettingsView from './views/SettingsView';
 import BottomNavBar from './components/BottomNavBar';
 import LoadingSpinner from './components/LoadingSpinner';
-// Fix: Corrected import path for useAuth
 import { useAuth } from './hooks/useAuth';
 import { supabase } from './lib/supabaseClient';
+import { ToastProvider } from './components/ToastProvider';
 
 type View = 'dashboard' | 'tools' | 'analytics' | 'settings';
 
@@ -20,7 +20,6 @@ const App: React.FC = () => {
   const { session, user, loading: authLoading } = useAuth();
 
   const [theme, setThemeState] = useState<Theme>(() => {
-    // This function runs only once on initial render
     const storedTheme = localStorage.getItem('theme');
     if (storedTheme === 'light' || storedTheme === 'dark') {
       return storedTheme;
@@ -99,16 +98,18 @@ const App: React.FC = () => {
   return (
     <ThemeContext.Provider value={themeContextValue}>
       <LanguageContext.Provider value={languageContextValue}>
-        {session ? (
-          <div className={`flex flex-col h-screen font-sans ${theme === 'dark' ? 'dark' : ''}`}>
-            <main className="flex-grow overflow-y-auto bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 pb-20">
-              {renderView()}
-            </main>
-            <BottomNavBar currentView={currentView} setCurrentView={setCurrentView} />
-          </div>
-        ) : (
-          <LoginView />
-        )}
+        <ToastProvider>
+          {session ? (
+            <div className={`flex flex-col h-screen font-sans ${theme === 'dark' ? 'dark' : ''}`}>
+              <main className="flex-grow overflow-y-auto bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 pb-20">
+                {renderView()}
+              </main>
+              <BottomNavBar currentView={currentView} setCurrentView={setCurrentView} />
+            </div>
+          ) : (
+            <LoginView />
+          )}
+        </ToastProvider>
       </LanguageContext.Provider>
     </ThemeContext.Provider>
   );
