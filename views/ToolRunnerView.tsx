@@ -5,6 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import GeneratedContent from '../components/GeneratedContent';
 import LottieAnimation from '../components/LottieAnimation';
 import { useToolRunner } from '../hooks/useToolRunner';
+import ImageUpload from '../components/ImageUpload';
 
 interface ToolRunnerViewProps {
   tool: Tool;
@@ -41,17 +42,12 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
         );
       case 'image':
         return (
-            <div>
-                 <input
-                    type="file"
-                    id={field.name}
-                    name={field.name}
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(field.name, e.target.files ? e.target.files[0] : null)}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100"
-                />
-                {imagePreview[field.name] && <img src={imagePreview[field.name]} alt="Preview" className="mt-2 rounded-lg max-h-40" />}
-            </div>
+            <ImageUpload 
+                label={t(field.labelKey)}
+                previewSrc={imagePreview[field.name] || null}
+                onFileSelect={(file) => handleFileChange(field.name, file)}
+                onClear={() => handleFileChange(field.name, null)}
+            />
         );
       case 'text':
       default:
@@ -86,7 +82,9 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {tool.inputs.map(field => (
             <div key={field.name}>
-              <label htmlFor={field.name} className="block text-sm font-medium mb-1">{t(field.labelKey)}</label>
+                {field.type !== 'image' && (
+                     <label htmlFor={field.name} className="block text-sm font-medium mb-1">{t(field.labelKey)}</label>
+                )}
               {renderInputField(field)}
             </div>
           ))}
