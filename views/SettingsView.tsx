@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { useLocalization } from '../hooks/useLocalization';
 import { type User } from '../types';
-import { supabase } from '../lib/supabaseClient';
-import { useToasts } from '../hooks/useToasts';
+import { useSettings } from '../hooks/useSettings';
 import Modal from '../components/Modal';
 
 interface SettingsViewProps {
@@ -14,50 +13,20 @@ interface SettingsViewProps {
 const SettingsView: React.FC<SettingsViewProps> = ({ user, onLogout }) => {
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, t } = useLocalization();
-  const { addToast } = useToasts();
-
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [loadingPassword, setLoadingPassword] = useState(false);
-  const [isSubscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
-
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoadingProfile(true);
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: fullName }
-    });
-    if (error) {
-      addToast(t('profile_update_error'), 'error');
-      console.error(error);
-    } else {
-      addToast(t('profile_saved_success'), 'success');
-    }
-    setLoadingProfile(false);
-  };
+  const {
+    fullName,
+    setFullName,
+    password,
+    setPassword,
+    confirmPassword,
+    setConfirmPassword,
+    loadingProfile,
+    loadingPassword,
+    handleProfileUpdate,
+    handlePasswordUpdate,
+  } = useSettings(user);
   
-  const handlePasswordUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      addToast(t('passwords_do_not_match'), 'error');
-      return;
-    }
-    if (!password) return;
-    setLoadingPassword(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      addToast(t('password_update_error'), 'error');
-      console.error(error);
-    } else {
-      addToast(t('password_changed_success'), 'success');
-      setPassword('');
-      setConfirmPassword('');
-    }
-    setLoadingPassword(false);
-  };
-
+  const [isSubscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
 
   return (
     <div>
