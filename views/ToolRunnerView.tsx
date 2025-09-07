@@ -1,15 +1,16 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { type Tool, type GeneratedContentData, type InputField } from '../types';
+import { type Tool, type GeneratedContentData, type InputField, type Generation } from '../types';
 import { useLocalization } from '../hooks/useLocalization';
 import { generateContentForTool, generateVideo } from '../services/geminiService';
 import LoadingSpinner from '../components/LoadingSpinner';
-import SkeletonLoader from '../components/SkeletonLoader';
 import GeneratedContent from '../components/GeneratedContent';
 import { triggerHapticFeedback } from '../lib/haptics';
 import { supabase } from '../lib/supabaseClient';
 import { useToasts } from '../hooks/useToasts';
 import { useAuth } from '../hooks/useAuth';
+import LottieAnimation from '../components/LottieAnimation';
 
+const CACHE_KEY = 'generationHistory';
 
 interface ToolRunnerViewProps {
   tool: Tool;
@@ -39,20 +40,33 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
   const saveGeneration = async (output: GeneratedContentData | string) => {
     if (!user) return;
     
-    // We don't save the file object itself, just the text inputs
     const textInputs = Object.fromEntries(
         Object.entries(inputs).filter(([, value]) => typeof value === 'string')
     );
 
-    const { error } = await supabase.from('generations').insert({
-      user_id: user.id,
-      tool_id: tool.id,
-      inputs: textInputs,
-      output: output,
-    });
+    const { data: newGeneration, error } = await supabase
+      .from('generations')
+      .insert({
+        user_id: user.id,
+        tool_id: tool.id,
+        inputs: textInputs,
+        output: output,
+      })
+      .select()
+      .single();
     
     if (error) {
         console.error('Failed to save generation:', error);
+    } else if (newGeneration) {
+        // Update local cache for instant UI feedback
+        try {
+            const cachedHistoryRaw = localStorage.getItem(CACHE_KEY);
+            const cachedHistory: Generation[] = cachedHistoryRaw ? JSON.parse(cachedHistoryRaw) : [];
+            const updatedHistory = [newGeneration, ...cachedHistory];
+            localStorage.setItem(CACHE_KEY, JSON.stringify(updatedHistory));
+        } catch (e) {
+            console.error('Failed to update history cache:', e);
+        }
     }
   };
 
@@ -212,8 +226,7 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
       {loading && !isResultView && (
         <div className="mt-6 text-center">
             <p className="mb-4">{status || t('generating_content')}</p>
-            {tool.id !== 'video_generator' && <SkeletonLoader />}
-            {tool.id === 'video_generator' && <LoadingSpinner />}
+            {tool.id !== 'video_generator' ? <LottieAnimation /> : <LoadingSpinner />}
         </div>
       )}
       

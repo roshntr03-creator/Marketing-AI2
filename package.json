@@ -12,7 +12,8 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "@google/genai": "^1.17.0",
-    "@supabase/supabase-js": "^2.57.2"
+    "@supabase/supabase-js": "^2.57.2",
+    "lottie-react": "^2.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

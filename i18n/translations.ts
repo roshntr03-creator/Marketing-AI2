@@ -81,6 +81,7 @@ const translations = {
     'sources': 'Sources',
     'close': 'Close',
     'short_form_factory_error': 'Please provide either long-form content or upload a product image.',
+    'generating_animation_label': 'AI is generating content animation',
 
     // Video Generation Status
     'generating_video': 'Generating video... This may take a few minutes.',
@@ -214,6 +215,7 @@ const translations = {
     'sources': 'المصادر',
     'close': 'إغلاق',
     'short_form_factory_error': 'يرجى تقديم محتوى طويل أو رفع صورة منتج.',
+    'generating_animation_label': 'أنيميشن إنشاء المحتوى بواسطة الذكاء الاصطناعي',
 
     // Video Generation Status
     'generating_video': 'جاري إنشاء الفيديو... قد يستغرق هذا بضع دقائق.',

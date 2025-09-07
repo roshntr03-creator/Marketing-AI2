@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../lib/supabaseClient';
 import { type Generation, type Tool } from '../types';
-import LoadingSpinner from '../components/LoadingSpinner';
-import { TOOLS } from '../constants';
 import HistoryItem from '../components/HistoryItem';
 import Modal from '../components/Modal';
 import GeneratedContent from '../components/GeneratedContent';
 import AnalyticsChart from '../components/AnalyticsChart';
+import HistoryItemSkeleton from '../components/HistoryItemSkeleton';
+import { TOOLS } from '../constants';
+
+const CACHE_KEY = 'generationHistory';
 
 const AnalyticsView: React.FC = () => {
     const { t } = useLocalization();
@@ -17,8 +19,24 @@ const AnalyticsView: React.FC = () => {
     const [selectedHistoryItem, setSelectedHistoryItem] = useState<Generation | null>(null);
 
     useEffect(() => {
+        // Load from cache first for instant UI
+        try {
+            const cachedHistoryRaw = localStorage.getItem(CACHE_KEY);
+            if (cachedHistoryRaw) {
+                const cachedHistory = JSON.parse(cachedHistoryRaw);
+                setHistory(cachedHistory);
+                setLoading(false); // We have data, no need for initial skeleton
+            }
+        } catch (e) {
+            console.error("Failed to load history from cache", e);
+        }
+
         const fetchHistory = async () => {
-            setLoading(true);
+            // Only show skeleton if cache was empty
+            if (history.length === 0) {
+                setLoading(true);
+            }
+
             const { data, error } = await supabase
                 .from('generations')
                 .select('*')
@@ -30,6 +48,12 @@ const AnalyticsView: React.FC = () => {
                 setError(error.message);
             } else {
                 setHistory(data as Generation[]);
+                // Update cache with fresh data
+                try {
+                    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+                } catch (e) {
+                    console.error("Failed to save history to cache", e);
+                }
             }
             setLoading(false);
         };
@@ -43,7 +67,13 @@ const AnalyticsView: React.FC = () => {
 
     const renderHistory = () => {
         if (loading) {
-            return <LoadingSpinner />;
+            return (
+                <div className="space-y-3">
+                    {[...Array(3)].map((_, index) => (
+                        <HistoryItemSkeleton key={index} />
+                    ))}
+                </div>
+            );
         }
         if (error) {
             return <p className="text-center text-red-500">{error}</p>;
