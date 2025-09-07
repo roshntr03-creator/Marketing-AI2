@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
-import { supabase } from '../lib/supabaseClient';
 import { type Generation, type Tool } from '../types';
 import HistoryItem from '../components/HistoryItem';
 import Modal from '../components/Modal';
@@ -8,58 +7,12 @@ import GeneratedContent from '../components/GeneratedContent';
 import AnalyticsChart from '../components/AnalyticsChart';
 import HistoryItemSkeleton from '../components/HistoryItemSkeleton';
 import { TOOLS } from '../constants';
-
-const CACHE_KEY = 'generationHistory';
+import { useHistory } from '../hooks/useHistory';
 
 const AnalyticsView: React.FC = () => {
     const { t } = useLocalization();
-    const [history, setHistory] = useState<Generation[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { history, loading, error } = useHistory();
     const [selectedHistoryItem, setSelectedHistoryItem] = useState<Generation | null>(null);
-
-    useEffect(() => {
-        // Load from cache first for instant UI
-        try {
-            const cachedHistoryRaw = localStorage.getItem(CACHE_KEY);
-            if (cachedHistoryRaw) {
-                const cachedHistory = JSON.parse(cachedHistoryRaw);
-                setHistory(cachedHistory);
-                setLoading(false); // We have data, no need for initial skeleton
-            }
-        } catch (e) {
-            console.error("Failed to load history from cache", e);
-        }
-
-        const fetchHistory = async () => {
-            // Only show skeleton if cache was empty
-            if (history.length === 0) {
-                setLoading(true);
-            }
-
-            const { data, error } = await supabase
-                .from('generations')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(50);
-
-            if (error) {
-                console.error('Error fetching history:', error);
-                setError(error.message);
-            } else {
-                setHistory(data as Generation[]);
-                // Update cache with fresh data
-                try {
-                    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-                } catch (e) {
-                    console.error("Failed to save history to cache", e);
-                }
-            }
-            setLoading(false);
-        };
-
-        fetchHistory();
-    }, []);
     
     const findToolById = (toolId: string): Tool | undefined => {
         return TOOLS.find(tool => tool.id === toolId);
