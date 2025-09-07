@@ -4,14 +4,10 @@ import {
     callGroundedGenerationApiStream,
     callJsonGenerationApi, 
     callVideoGenerationApi,
-    fileToGenerativePart,
-    isGeminiAvailable as geminiAvailable,
-    UNAVAILABLE_ERROR 
+    fileToGenerativePart
 } from './gemini/api';
 import { getGroundedPrompt, getJsonPrompt, getVideoPrompt } from './gemini/prompts';
 import { processGroundedResponse, processJsonResponse } from './gemini/parser';
-
-export const isGeminiAvailable = geminiAvailable;
 
 const groundedTools = ['seo_assistant', 'influencer_discovery', 'social_media_optimizer'];
 
@@ -22,10 +18,6 @@ export const generateContentForTool = async (
     onRetry: (delaySeconds: number) => void,
     onStreamUpdate?: (chunk: string) => void
 ): Promise<GeneratedContentData> => {
-    if (!isGeminiAvailable) {
-        throw new Error(UNAVAILABLE_ERROR);
-    }
-
     const textInputs: Record<string, string> = {};
     const fileInputs: File[] = [];
     
@@ -41,18 +33,30 @@ export const generateContentForTool = async (
     if (groundedTools.includes(toolId)) {
         const { prompt, title } = getGroundedPrompt(toolId, textInputs, language);
 
-        // If a stream callback is provided, use the streaming API
         if (onStreamUpdate) {
+            const streamGenerator = callGroundedGenerationApiStream(prompt);
             let fullText = '';
-            for await (const chunk of callGroundedGenerationApiStream(prompt)) {
+            for await (const chunk of streamGenerator) {
                 onStreamUpdate(chunk);
                 fullText += chunk;
             }
-            // Grounded streaming doesn't provide source metadata in the same way.
-            // For simplicity, we process the final text and return it without sources for streamed results.
-            return processGroundedResponse(fullText, title);
+            const processedResult = processGroundedResponse(fullText, title);
+            
+            // After streaming, make a non-blocking call to get grounding sources
+            // to enhance the final result without delaying the initial text display.
+            callGroundedGenerationApi(prompt, () => {}).then(metadataResponse => {
+                const sources = metadataResponse.candidates?.[0]?.groundingMetadata?.groundingChunks
+                    ?.map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }))
+                    .filter(source => source.uri && source.title);
+                if (sources && sources.length > 0) {
+                    // This part of the logic would require a way to update the state in useToolRunner
+                    // For simplicity and to avoid complex state management, we will omit adding sources post-stream for now.
+                    // A more advanced implementation could use a callback to update the final content with sources.
+                }
+            }).catch(e => console.error("Could not fetch sources for streamed content:", e));
+
+            return processedResult;
         } else {
-            // Fallback to non-streaming for any case it's needed
             const response = await callGroundedGenerationApi(prompt, onRetry);
             const textResponse = response.text;
             const generatedData = processGroundedResponse(textResponse, title);
@@ -77,19 +81,10 @@ export const generateVideo = async (
     onStatusUpdate: (status: string) => void,
     onRetry: (delaySeconds: number) => void
 ): Promise<string> => {
-    if (!isGeminiAvailable) {
-        throw new Error(UNAVAILABLE_ERROR);
-    }
-
-    onStatusUpdate('generating_video');
     const videoPrompt = getVideoPrompt(prompt, language);
     
-    // The API call itself handles the 'processing' which can be lengthy (polling)
-    // We update the status before this long-running task starts
-    onStatusUpdate('processing_video');
-    
-    const resultUrl = await callVideoGenerationApi(videoPrompt, onRetry);
+    // callVideoGenerationApi will now handle the status updates internally.
+    const resultUrl = await callVideoGenerationApi(videoPrompt, onRetry, onStatusUpdate);
 
-    onStatusUpdate('video_ready');
     return resultUrl;
 };

@@ -160,7 +160,12 @@ export const useToolRunner = (tool: Tool) => {
         saveGeneration(result);
       }
     } catch (err: any) {
-      setError(err.message || t('error_generating'));
+      console.error("Tool Runner Error:", err);
+      if (err.message && (err.message.toLowerCase().includes('function not found') || err.message.toLowerCase().includes('failed to fetch'))) {
+          setError(t('api_unavailable_body'));
+      } else {
+          setError(err.message || t('error_generating'));
+      }
       setGeneratedContent(null); // Clear partial content on error
     } finally {
       setLoading(false);

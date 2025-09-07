@@ -5,13 +5,10 @@ import { TOOLS } from '../constants';
 import { useLocalization } from '../hooks/useLocalization';
 import ToolCard from '../components/ToolCard';
 import ToolRunnerView from './ToolRunnerView';
-import { isGeminiAvailable } from '../services/geminiService';
-import Modal from '../components/Modal';
 
 const ToolsView: React.FC = () => {
   const { t } = useLocalization();
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
-  const [showApiErrorModal, setShowApiErrorModal] = useState(false);
 
   const categories = useMemo(() => {
     const categoryMap: { [key: string]: Tool[] } = {};
@@ -25,11 +22,7 @@ const ToolsView: React.FC = () => {
   }, []);
   
   const handleSelectTool = (tool: Tool) => {
-    if (!isGeminiAvailable) {
-        setShowApiErrorModal(true);
-    } else {
-        setSelectedTool(tool);
-    }
+    setSelectedTool(tool);
   };
 
   const handleBack = () => {
@@ -55,20 +48,6 @@ const ToolsView: React.FC = () => {
           </div>
         ))}
       </div>
-      <Modal
-        isOpen={showApiErrorModal}
-        onClose={() => setShowApiErrorModal(false)}
-        title={t('api_unavailable_title')}
-      >
-        <div className="text-center p-4">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/50 mb-4">
-                <i className="fa-solid fa-triangle-exclamation text-2xl text-orange-500"></i>
-            </div>
-            <p className="text-gray-700 dark:text-gray-300">
-                {t('api_unavailable_body')}
-            </p>
-        </div>
-      </Modal>
     </div>
   );
 };

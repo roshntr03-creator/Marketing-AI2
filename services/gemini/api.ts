@@ -1,14 +1,7 @@
-import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
+import { Type, GenerateContentResponse } from "@google/genai";
+import { supabase } from '../../lib/supabaseClient';
 
-const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : undefined;
-
-export const isGeminiAvailable = !!apiKey;
-
-const ai = isGeminiAvailable ? new GoogleGenAI({ apiKey: apiKey as string }) : null;
-const textModel = 'gemini-2.5-flash';
-const videoModel = 'veo-2.0-generate-001';
-
-export const UNAVAILABLE_ERROR = "AI Service is not configured. The API_KEY environment variable is missing.";
+export const UNAVAILABLE_ERROR = "The AI service is currently unavailable. Please contact the administrator.";
 
 export const responseSchema = {
     type: Type.OBJECT,
@@ -54,98 +47,121 @@ const withRetry = async <T>(
             lastError = err;
             if (err.message && (err.message.includes('RESOURCE_EXHAUSTED') || err.message.includes('429'))) {
                 if (attempt < MAX_RETRIES - 1) {
-                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000; // Exponential backoff with jitter
+                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
                     const delaySeconds = Math.ceil(delay / 1000);
                     onRetry(delaySeconds);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             } else {
-                throw err; // Not a retriable error
+                throw err;
             }
         }
     }
-    throw lastError; // All retries failed
+    throw lastError;
 };
 
+const invokeFunction = async (endpoint: string, params: any) => {
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+        body: { endpoint, params }
+    });
+    if (error) throw error;
+    if (data.error) throw new Error(data.error);
+    return data;
+};
 
 export const callGroundedGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void): Promise<GenerateContentResponse> => {
-    if (!ai) throw new Error(UNAVAILABLE_ERROR);
-    const apiCall = () => ai.models.generateContent({
-        model: textModel,
+    const params = {
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: { tools: [{ googleSearch: {} }] },
-    });
+    };
+    const apiCall = () => invokeFunction('generateContent', params);
     return withRetry(apiCall, onRetry);
 };
 
 export async function* callGroundedGenerationApiStream(prompt: string): AsyncGenerator<string> {
-    if (!ai) throw new Error(UNAVAILABLE_ERROR);
-
-    const responseStream = await ai.models.generateContentStream({
-        model: textModel,
+    const params = {
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: { tools: [{ googleSearch: {} }] },
-    });
+    };
+    
+    // FIX: Use 'as any' to allow 'responseType' which may not be in the project's Supabase client types.
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+        body: { endpoint: 'generateContentStream', params },
+        responseType: 'stream'
+    } as any);
 
-    for await (const chunk of responseStream) {
-        // In grounded generation, sources can appear in groundingMetadata. We handle text here.
-        yield chunk.text;
+    if (error) throw error;
+    if (!data) return;
+
+    const reader = data.getReader();
+    const decoder = new TextDecoder();
+    
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        yield decoder.decode(value);
     }
 }
 
 export const callJsonGenerationApi = async (prompt: string, imageParts: any[], onRetry: (delaySeconds: number) => void): Promise<GenerateContentResponse> => {
-    if (!ai) throw new Error(UNAVAILABLE_ERROR);
     const contents = { parts: [{ text: prompt }, ...imageParts] };
-    const apiCall = () => ai.models.generateContent({
-        model: textModel,
+    const params = {
+        model: 'gemini-2.5-flash',
         contents: contents,
         config: {
             responseMimeType: 'application/json',
             responseSchema: responseSchema,
         },
-    });
+    };
+    const apiCall = () => invokeFunction('generateContent', params);
     return withRetry(apiCall, onRetry);
 };
 
-export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void) => {
-    if (!ai) throw new Error(UNAVAILABLE_ERROR);
-    
-    // Initial call to start the operation
-    const initialApiCall = () => ai.models.generateVideos({
-        model: videoModel,
+export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void, onStatusUpdate: (status: string) => void) => {
+    const startParams = {
+        model: 'veo-2.0-generate-001',
         prompt: prompt,
         config: { numberOfVideos: 1 }
-    });
+    };
     
-    const operation = await withRetry(initialApiCall, onRetry);
+    // 1. Start video generation
+    onStatusUpdate('generating_video');
+    const startGenerationCall = () => invokeFunction('generateVideos', startParams);
+    let { operation } = await withRetry(startGenerationCall, onRetry);
 
-    // Poll for completion
-    let polledOperation: any = operation;
-    while (!polledOperation.done) {
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      polledOperation = await ai.operations.getVideosOperation({ operation: polledOperation });
+    // 2. Poll for completion
+    onStatusUpdate('processing_video');
+    while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
+        
+        const checkStatusCall = () => invokeFunction('getVideosOperation', { operation });
+        try {
+            const result = await withRetry(checkStatusCall, onRetry);
+            operation = result.operation;
+        } catch(e) {
+            console.warn("Polling for video status failed, will retry.", e);
+        }
     }
-    
-    const downloadLink = polledOperation.response?.generatedVideos?.[0]?.video?.uri;
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+
     if (!downloadLink) {
         throw new Error("Video generation failed or returned no link.");
     }
     
-    // Fetch the video data and create a blob URL
-    const fetchVideoApiCall = async () => {
-        if (!apiKey) throw new Error("API Key is missing for video download.");
-        const response = await fetch(`${downloadLink}&key=${apiKey}`);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch video: ${response.statusText}`);
-        }
-        return response.blob();
-    };
+    // 3. Download the video
+    onStatusUpdate('video_ready');
+    const { data: videoBlob, error: downloadError } = await supabase.functions.invoke('download-video', {
+        body: { uri: downloadLink },
+        responseType: 'blob'
+    } as any);
 
-    try {
-        const videoBlob = await withRetry(fetchVideoApiCall, onRetry);
-        return URL.createObjectURL(videoBlob);
-    } catch(e) {
-        console.error("Failed to download video content", e);
+    if (downloadError) {
+        console.error("Failed to download video content via function", downloadError);
         throw new Error("Failed to download the generated video. Please check your network and try again.");
     }
+    
+    return URL.createObjectURL(videoBlob);
 };
