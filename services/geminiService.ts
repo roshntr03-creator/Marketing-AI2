@@ -1,6 +1,7 @@
 import { GeneratedContentData, Language } from "../types";
 import { 
     callGroundedGenerationApi, 
+    callGroundedGenerationApiStream,
     callJsonGenerationApi, 
     callVideoGenerationApi,
     fileToGenerativePart,
@@ -18,7 +19,8 @@ export const generateContentForTool = async (
     toolId: string,
     inputs: Record<string, string | File>,
     language: Language,
-    onRetry: (delaySeconds: number) => void
+    onRetry: (delaySeconds: number) => void,
+    onStreamUpdate?: (chunk: string) => void
 ): Promise<GeneratedContentData> => {
     if (!isGeminiAvailable) {
         throw new Error(UNAVAILABLE_ERROR);
@@ -38,14 +40,28 @@ export const generateContentForTool = async (
     
     if (groundedTools.includes(toolId)) {
         const { prompt, title } = getGroundedPrompt(toolId, textInputs, language);
-        const response = await callGroundedGenerationApi(prompt, onRetry);
-        const textResponse = response.text;
-        const generatedData = processGroundedResponse(textResponse, title);
-        const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-            ?.map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }))
-            .filter(source => source.uri && source.title);
-        generatedData.sources = sources;
-        return generatedData;
+
+        // If a stream callback is provided, use the streaming API
+        if (onStreamUpdate) {
+            let fullText = '';
+            for await (const chunk of callGroundedGenerationApiStream(prompt)) {
+                onStreamUpdate(chunk);
+                fullText += chunk;
+            }
+            // Grounded streaming doesn't provide source metadata in the same way.
+            // For simplicity, we process the final text and return it without sources for streamed results.
+            return processGroundedResponse(fullText, title);
+        } else {
+            // Fallback to non-streaming for any case it's needed
+            const response = await callGroundedGenerationApi(prompt, onRetry);
+            const textResponse = response.text;
+            const generatedData = processGroundedResponse(textResponse, title);
+            const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+                ?.map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }))
+                .filter(source => source.uri && source.title);
+            generatedData.sources = sources;
+            return generatedData;
+        }
     }
 
     const imageParts = await Promise.all(fileInputs.map(fileToGenerativePart));

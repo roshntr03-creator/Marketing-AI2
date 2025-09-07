@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 
 const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : undefined;
 
@@ -68,7 +68,7 @@ const withRetry = async <T>(
 };
 
 
-export const callGroundedGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void) => {
+export const callGroundedGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void): Promise<GenerateContentResponse> => {
     if (!ai) throw new Error(UNAVAILABLE_ERROR);
     const apiCall = () => ai.models.generateContent({
         model: textModel,
@@ -78,7 +78,22 @@ export const callGroundedGenerationApi = async (prompt: string, onRetry: (delayS
     return withRetry(apiCall, onRetry);
 };
 
-export const callJsonGenerationApi = async (prompt: string, imageParts: any[], onRetry: (delaySeconds: number) => void) => {
+export async function* callGroundedGenerationApiStream(prompt: string): AsyncGenerator<string> {
+    if (!ai) throw new Error(UNAVAILABLE_ERROR);
+
+    const responseStream = await ai.models.generateContentStream({
+        model: textModel,
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] },
+    });
+
+    for await (const chunk of responseStream) {
+        // In grounded generation, sources can appear in groundingMetadata. We handle text here.
+        yield chunk.text;
+    }
+}
+
+export const callJsonGenerationApi = async (prompt: string, imageParts: any[], onRetry: (delaySeconds: number) => void): Promise<GenerateContentResponse> => {
     if (!ai) throw new Error(UNAVAILABLE_ERROR);
     const contents = { parts: [{ text: prompt }, ...imageParts] };
     const apiCall = () => ai.models.generateContent({

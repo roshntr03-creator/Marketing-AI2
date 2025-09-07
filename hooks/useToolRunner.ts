@@ -8,6 +8,8 @@ import { useToasts } from './useToasts';
 import { useAuth } from './useAuth';
 
 const CACHE_KEY = 'generationHistory';
+const groundedTools = ['seo_assistant', 'influencer_discovery', 'social_media_optimizer'];
+
 
 export const useToolRunner = (tool: Tool) => {
   const { t, language } = useLocalization();
@@ -74,7 +76,6 @@ export const useToolRunner = (tool: Tool) => {
       reader.onloadend = () => {
         setImagePreview(prev => ({ ...prev, [name]: reader.result as string }));
       };
-      // Fix: Corrected typo from readDataURL to readAsDataURL.
       reader.readAsDataURL(file);
     } else {
       setInputs(prev => {
@@ -121,6 +122,8 @@ export const useToolRunner = (tool: Tool) => {
     setVideoUrl(null);
     setStatus(t('generating_content'));
 
+    const isStreamable = groundedTools.includes(tool.id);
+
     try {
       if (tool.id === 'video_generator') {
         const prompt = inputs.prompt as string;
@@ -129,13 +132,36 @@ export const useToolRunner = (tool: Tool) => {
         setVideoUrl(resultUrl);
         addToast(t('video_gen_complete_toast'), 'success');
         saveGeneration(prompt);
+      } else if (isStreamable) {
+        // Handle streaming for grounded tools
+        setGeneratedContent({
+          title: t(tool.nameKey),
+          sections: [{ heading: 'AI-Generated Analysis', content: '' }],
+        });
+
+        const onStreamUpdate = (chunk: string) => {
+          setGeneratedContent(prev => {
+            if (!prev) return null; // Should not happen
+            const newContent = (prev.sections[0].content || '') + chunk;
+            return {
+              ...prev,
+              sections: [{ ...prev.sections[0], content: newContent }],
+            };
+          });
+        };
+        
+        const finalResult = await generateContentForTool(tool.id, inputs, language, onRetry, onStreamUpdate);
+        setGeneratedContent(finalResult); // Set final, polished content
+        saveGeneration(finalResult);
       } else {
+        // Handle non-streaming tools
         const result = await generateContentForTool(tool.id, inputs, language, onRetry);
         setGeneratedContent(result);
         saveGeneration(result);
       }
     } catch (err: any) {
       setError(err.message || t('error_generating'));
+      setGeneratedContent(null); // Clear partial content on error
     } finally {
       setLoading(false);
       setStatus('');
