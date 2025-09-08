@@ -1,7 +1,11 @@
 import { Type, GenerateContentResponse } from "@google/genai";
-import { supabase } from '../../lib/supabaseClient';
+import { auth } from '../../lib/firebaseClient';
 
 export const UNAVAILABLE_ERROR = "The AI service is currently unavailable. Please contact the administrator.";
+
+// TODO: Replace with your deployed Firebase Function URLs
+const GEMINI_PROXY_URL = 'YOUR_FIREBASE_FUNCTION_URL/geminiProxy';
+const DOWNLOAD_VIDEO_URL = 'YOUR_FIREBASE_FUNCTION_URL/downloadVideo';
 
 export const responseSchema = {
     type: Type.OBJECT,
@@ -61,12 +65,35 @@ const withRetry = async <T>(
 };
 
 const invokeFunction = async (endpoint: string, params: any) => {
-    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
-        body: { endpoint, params }
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error("Authentication required.");
+    }
+
+    const idToken = await user.getIdToken();
+
+    const response = await fetch(GEMINI_PROXY_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ endpoint, params }),
     });
-    if (error) throw error;
-    if (data.error) throw new Error(data.error);
-    return data;
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText, hint: 'The server returned a non-JSON response.' }));
+        const err = new Error(errorData.error || 'An unknown server error occurred.');
+        (err as any).context = errorData;
+        throw err;
+    }
+    
+    // For streaming, we want the raw response body. For others, JSON.
+    if (endpoint.endsWith('Stream')) {
+        return response.body;
+    }
+
+    return response.json();
 };
 
 export const callGroundedGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void): Promise<GenerateContentResponse> => {
@@ -86,14 +113,11 @@ export async function* callGroundedGenerationApiStream(prompt: string): AsyncGen
         config: { tools: [{ googleSearch: {} }] },
     };
     
-    // FIX: Use 'as any' to allow 'responseType' which may not be in the project's Supabase client types.
-    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
-        body: { endpoint: 'generateContentStream', params },
-        responseType: 'stream'
-    } as any);
+    const data = await invokeFunction('generateContentStream', params);
 
-    if (error) throw error;
-    if (!data) return;
+    if (!(data instanceof ReadableStream)) {
+       throw new Error("Received an unexpected response type from the streaming function.");
+    }
 
     const reader = data.getReader();
     const decoder = new TextDecoder();
@@ -126,23 +150,37 @@ export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeco
         config: { numberOfVideos: 1 }
     };
     
-    // 1. Start video generation
     onStatusUpdate('generating_video');
     const startGenerationCall = () => invokeFunction('generateVideos', startParams);
     let { operation } = await withRetry(startGenerationCall, onRetry);
 
-    // 2. Poll for completion
     onStatusUpdate('processing_video');
-    while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
-        
+    const MAX_POLLING_ATTEMPTS = 10;
+    let pollingFailures = 0;
+
+    while (operation && !operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 10000));
+
         const checkStatusCall = () => invokeFunction('getVideosOperation', { operation });
         try {
             const result = await withRetry(checkStatusCall, onRetry);
-            operation = result.operation;
-        } catch(e) {
-            console.warn("Polling for video status failed, will retry.", e);
+            if (result && result.operation) {
+                operation = result.operation;
+                pollingFailures = 0; // Reset on success
+            } else {
+                throw new Error("Invalid polling response from server.");
+            }
+        } catch (e) {
+            pollingFailures++;
+            console.warn(`Polling attempt ${pollingFailures}/${MAX_POLLING_ATTEMPTS} failed.`, e);
+            if (pollingFailures >= MAX_POLLING_ATTEMPTS) {
+                throw new Error("Video status check failed too many times. Please try again later.");
+            }
         }
+    }
+    
+    if (!operation?.done) {
+        throw new Error("Video generation did not complete successfully or was aborted.");
     }
 
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
@@ -151,17 +189,27 @@ export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeco
         throw new Error("Video generation failed or returned no link.");
     }
     
-    // 3. Download the video
     onStatusUpdate('video_ready');
-    const { data: videoBlob, error: downloadError } = await supabase.functions.invoke('download-video', {
-        body: { uri: downloadLink },
-        responseType: 'blob'
-    } as any);
+    
+    const user = auth.currentUser;
+    if (!user) throw new Error("Authentication required for download.");
+    const idToken = await user.getIdToken();
 
-    if (downloadError) {
-        console.error("Failed to download video content via function", downloadError);
+    const response = await fetch(DOWNLOAD_VIDEO_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ uri: downloadLink }),
+    });
+
+
+    if (!response.ok) {
+        console.error("Failed to download video content via function");
         throw new Error("Failed to download the generated video. Please check your network and try again.");
     }
-    
+
+    const videoBlob = await response.blob();
     return URL.createObjectURL(videoBlob);
 };

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { type User } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { auth } from '../lib/firebaseClient';
+import { updateProfile, updatePassword } from 'firebase/auth';
 import { useToasts } from './useToasts';
 import { useLocalization } from './useLocalization';
 
@@ -8,23 +9,29 @@ export const useSettings = (user: User | null) => {
   const { addToast } = useToasts();
   const { t } = useLocalization();
 
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
+  const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [loadingPassword, setLoadingPassword] = useState(false);
 
+  useEffect(() => {
+    if (user) {
+      setFullName(user.displayName || '');
+    }
+  }, [user]);
+
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth.currentUser) return;
+
     setLoadingProfile(true);
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: fullName }
-    });
-    if (error) {
+    try {
+      await updateProfile(auth.currentUser, { displayName: fullName });
+      addToast(t('profile_saved_success'), 'success');
+    } catch (error) {
       addToast(t('profile_update_error'), 'error');
       console.error(error);
-    } else {
-      addToast(t('profile_saved_success'), 'success');
     }
     setLoadingProfile(false);
   };
@@ -35,16 +42,17 @@ export const useSettings = (user: User | null) => {
       addToast(t('passwords_do_not_match'), 'error');
       return;
     }
-    if (!password) return;
+    if (!password || !auth.currentUser) return;
+
     setLoadingPassword(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      addToast(t('password_update_error'), 'error');
-      console.error(error);
-    } else {
+    try {
+      await updatePassword(auth.currentUser, password);
       addToast(t('password_changed_success'), 'success');
       setPassword('');
       setConfirmPassword('');
+    } catch (error: any) {
+      addToast(t('password_update_error'), 'error');
+      console.error(error);
     }
     setLoadingPassword(false);
   };

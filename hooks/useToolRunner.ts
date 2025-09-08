@@ -3,9 +3,10 @@ import { type Tool, type GeneratedContentData, type Generation } from '../types'
 import { useLocalization } from './useLocalization';
 import { generateContentForTool, generateVideo } from '../services/geminiService';
 import { triggerHapticFeedback } from '../lib/haptics';
-import { supabase } from '../lib/supabaseClient';
 import { useToasts } from './useToasts';
 import { useAuth } from './useAuth';
+import { db } from '../lib/firebaseClient';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const CACHE_KEY = 'generationHistory';
 const groundedTools = ['seo_assistant', 'influencer_discovery', 'social_media_optimizer'];
@@ -38,30 +39,32 @@ export const useToolRunner = (tool: Tool) => {
     const textInputs = Object.fromEntries(
       Object.entries(inputs).filter(([, value]) => typeof value === 'string')
     );
-
-    const { data: newGeneration, error } = await supabase
-      .from('generations')
-      .insert({
-        user_id: user.id,
+    
+    try {
+      const docRef = await addDoc(collection(db, 'generations'), {
+        userId: user.uid,
         tool_id: tool.id,
         inputs: textInputs,
         output: output,
-      })
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Failed to save generation:', error);
-    } else if (newGeneration) {
+        createdAt: serverTimestamp(),
+      });
+
       // Update local cache for instant UI feedback
-      try {
-        const cachedHistoryRaw = localStorage.getItem(CACHE_KEY);
-        const cachedHistory: Generation[] = cachedHistoryRaw ? JSON.parse(cachedHistoryRaw) : [];
-        const updatedHistory = [newGeneration, ...cachedHistory];
-        localStorage.setItem(CACHE_KEY, JSON.stringify(updatedHistory));
-      } catch (e) {
-        console.error('Failed to update history cache:', e);
-      }
+      const newGeneration: Generation = {
+        id: docRef.id,
+        created_at: new Date().toISOString(), // Approximate for immediate UI
+        tool_id: tool.id,
+        inputs: textInputs,
+        output: output as GeneratedContentData, // Assuming correct type for cache
+      };
+      
+      const cachedHistoryRaw = localStorage.getItem(CACHE_KEY);
+      const cachedHistory: Generation[] = cachedHistoryRaw ? JSON.parse(cachedHistoryRaw) : [];
+      const updatedHistory = [newGeneration, ...cachedHistory];
+      localStorage.setItem(CACHE_KEY, JSON.stringify(updatedHistory));
+
+    } catch (error) {
+      console.error('Failed to save generation:', error);
     }
   };
 
@@ -161,11 +164,16 @@ export const useToolRunner = (tool: Tool) => {
       }
     } catch (err: any) {
       console.error("Tool Runner Error:", err);
-      if (err.message && (err.message.toLowerCase().includes('function not found') || err.message.toLowerCase().includes('failed to fetch'))) {
-          setError(t('api_unavailable_body'));
-      } else {
-          setError(err.message || t('error_generating'));
+      
+      const functionError = err.context?.error;
+      const functionHint = err.context?.hint;
+      
+      let detailedError = functionError || err.message || t('error_generating');
+      if(functionHint) {
+        detailedError = `${detailedError} (Hint: ${functionHint})`;
       }
+
+      setError(detailedError);
       setGeneratedContent(null); // Clear partial content on error
     } finally {
       setLoading(false);

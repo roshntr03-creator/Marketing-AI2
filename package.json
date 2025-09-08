@@ -12,8 +12,12 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "@google/genai": "^1.17.0",
+    "lottie-react": "^2.4.0",
+    "firebase": "^12.2.1",
     "@supabase/supabase-js": "^2.57.2",
-    "lottie-react": "^2.4.0"
+    "cors": "^2.8.5",
+    "firebase-functions": "^6.4.0",
+    "firebase-admin": "^13.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

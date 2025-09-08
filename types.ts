@@ -1,4 +1,4 @@
-import type { User, Session } from '@supabase/supabase-js';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 export type Theme = 'light' | 'dark';
 
@@ -50,11 +50,10 @@ export interface ToastContextType {
 }
 
 
-// Re-exporting Supabase types for consistent imports
-export type { User };
+// Re-exporting Firebase user type for consistent imports
+export type User = FirebaseUser;
 
 export interface AuthContextType {
-  session: Session | null;
   user: User | null;
   loading: boolean;
 }

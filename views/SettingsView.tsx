@@ -111,18 +111,32 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onLogout }) => {
         {/* Troubleshooting Section */}
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-3">{t('troubleshooting')}</h2>
-          <div className="flex items-start space-x-3 rtl:space-x-reverse">
-              <div className="flex-shrink-0 pt-1">
-                <i className="fa-solid fa-circle-question text-cyan-400 text-xl"></i>
-              </div>
-              <div>
-                  <h3 className="font-semibold text-gray-800 dark:text-gray-200">{t('api_key_help_title')}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      {t('api_key_help_content')}
-                  </p>
-              </div>
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3 rtl:space-x-reverse">
+                <div className="flex-shrink-0 pt-1">
+                  <i className="fa-solid fa-cogs text-cyan-400 text-xl"></i>
+                </div>
+                <div>
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-200">{t('firebase_config_help_title')}</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {t('firebase_config_help_content')}
+                    </p>
+                </div>
+            </div>
+            <div className="flex items-start space-x-3 rtl:space-x-reverse">
+                <div className="flex-shrink-0 pt-1">
+                  <i className="fa-solid fa-server text-cyan-400 text-xl"></i>
+                </div>
+                <div>
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-200">{t('backend_functions_help_title')}</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {t('backend_functions_help_content')}
+                    </p>
+                </div>
+            </div>
           </div>
         </div>
+
 
         {/* Logout */}
         <div className="mt-8">

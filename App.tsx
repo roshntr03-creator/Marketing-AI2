@@ -11,13 +11,14 @@ import SettingsView from './views/SettingsView';
 import BottomNavBar from './components/BottomNavBar';
 import LoadingSpinner from './components/LoadingSpinner';
 import { useAuth } from './hooks/useAuth';
-import { supabase } from './lib/supabaseClient';
+import { auth } from './lib/firebaseClient';
+import { signOut } from 'firebase/auth';
 import { ToastProvider } from './components/ToastProvider';
 
 type View = 'dashboard' | 'tools' | 'analytics' | 'settings';
 
 const App: React.FC = () => {
-  const { session, user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [theme, setThemeState] = useState<Theme>(() => {
     const storedTheme = localStorage.getItem('theme');
@@ -69,7 +70,7 @@ const App: React.FC = () => {
   const themeContextValue = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
   
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
   };
 
   if (authLoading) {
@@ -99,7 +100,7 @@ const App: React.FC = () => {
     <ThemeContext.Provider value={themeContextValue}>
       <LanguageContext.Provider value={languageContextValue}>
         <ToastProvider>
-          {session ? (
+          {user ? (
             <div className={`flex flex-col h-screen font-sans ${theme === 'dark' ? 'dark' : ''}`}>
               <main className="flex-grow overflow-y-auto bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 pb-20">
                 {renderView()}

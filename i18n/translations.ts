@@ -100,8 +100,10 @@ const translations = {
 
     // Settings & Troubleshooting
     'troubleshooting': 'Troubleshooting',
-    'api_key_help_title': 'AI Service Configuration',
-    'api_key_help_content': "This application uses a secure backend service (a Supabase Edge Function) to communicate with Google's AI. For this to work, the administrator must configure the `API_KEY` as a secret environment variable for that service. If AI features are not working, it means this backend service is not deployed or configured correctly. Please contact your administrator for assistance.",
+    'firebase_config_help_title': 'Firebase Project Configuration',
+    'firebase_config_help_content': "This application now uses Firebase for authentication, database, and backend functions. For the app to work, you must create a Firebase project and configure the project details in the `lib/firebaseClient.ts` file. You also need to deploy the provided Cloud Functions from the `firebase/functions` directory and update the function URLs in `services/gemini/api.ts`.",
+    'backend_functions_help_title': 'Backend Cloud Functions',
+    'backend_functions_help_content': "The AI logic runs on a secure backend. The code for this is in the `firebase/functions` directory. You need to deploy these functions to your Firebase project. Also, make sure to set your Google AI API key as a secret for the functions using the Firebase CLI: `firebase functions:secrets:set API_KEY`.",
     'profile': 'Profile',
     'full_name': 'Full Name',
     'save_profile': 'Save Profile',
@@ -234,8 +236,10 @@ const translations = {
     
     // Settings & Troubleshooting
     'troubleshooting': 'استكشاف الأخطاء وإصلاحها',
-    'api_key_help_title': 'إعدادات خدمة الذكاء الاصطناعي',
-    'api_key_help_content': 'يستخدم هذا التطبيق خدمة خلفية آمنة (Supabase Edge Function) للتواصل مع ذكاء جوجل الاصطناعي. لكي يعمل هذا، يجب على المسؤول تكوين `API_KEY` كمتغير بيئة سري للخدمة. إذا كانت ميزات الذكاء الاصطناعي لا تعمل، فهذا يعني أن هذه الخدمة الخلفية لم يتم نشرها أو تكوينها بشكل صحيح. يرجى الاتصال بالمسؤول للحصول على المساعدة.',
+    'firebase_config_help_title': 'إعدادات مشروع Firebase',
+    'firebase_config_help_content': 'يستخدم هذا التطبيق الآن Firebase للمصادقة وقاعدة البيانات والوظائف الخلفية. لكي يعمل التطبيق، يجب عليك إنشاء مشروع Firebase وتكوين تفاصيل المشروع في ملف `lib/firebaseClient.ts`. تحتاج أيضًا إلى نشر وظائف السحابة المتوفرة من دليل `firebase/functions` وتحديث عناوين URL للوظائف في `services/gemini/api.ts`.',
+    'backend_functions_help_title': 'وظائف السحابة الخلفية',
+    'backend_functions_help_content': 'منطق الذكاء الاصطناعي يعمل على خلفية آمنة. يوجد الكود الخاص بهذا في دليل `firebase/functions`. تحتاج إلى نشر هذه الوظائف في مشروع Firebase الخاص بك. تأكد أيضًا من تعيين مفتاح API الخاص بـ Google AI كسر للوظائف باستخدام Firebase CLI: `firebase functions:secrets:set API_KEY`.',
     'profile': 'الملف الشخصي',
     'full_name': 'الاسم الكامل',
     'save_profile': 'حفظ الملف الشخصي',
