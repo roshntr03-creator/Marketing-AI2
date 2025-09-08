@@ -1,4 +1,3 @@
-
 {
   "functions": {
     "source": "firebase/functions"
@@ -12,10 +11,24 @@
       "*.md",
       "*.log"
     ],
-    "rewrites": [
+    "headers": [
       {
-        "source": "**",
-        "destination": "/index.html"
+        "source": "**/*.tsx",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/javascript; charset=utf-8"
+          }
+        ]
+      },
+      {
+        "source": "**/*.ts",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/javascript; charset=utf-8"
+          }
+        ]
       }
     ]
   }

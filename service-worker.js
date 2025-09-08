@@ -88,6 +88,3 @@ self.addEventListener('fetch', (event) => {
             })
     );
 });
-// FIX: Add an empty export to treat this file as a module and prevent global scope pollution,
-// which resolves "Cannot redeclare block-scoped variable" errors.
-export {};
