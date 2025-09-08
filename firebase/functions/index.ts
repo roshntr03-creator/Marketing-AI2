@@ -1,7 +1,4 @@
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
-// FIX: Explicitly import Express types for `onRequest` handlers. The default
-// type inference can fail, so providing the correct types is necessary.
-import type { Request, Response } from "express";
 import * as admin from "firebase-admin";
 import { GoogleGenAI } from "@google/genai";
 import cors from "cors";
@@ -68,8 +65,8 @@ export const geminiApiCall = onCall(FUNCTION_CONFIG, async (request) => {
  * Handles streaming text generation from the Gemini API.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Add explicit Express types for req and res to resolve compilation errors.
-export const geminiApiStream = onRequest(FUNCTION_CONFIG, (req: Request, res: Response) => {
+// FIX: Removed explicit Express types from the handler. Type inference from `onRequest` provides the correct types for `req` and `res`, resolving compilation errors.
+export const geminiApiStream = onRequest(FUNCTION_CONFIG, (req, res) => {
     // Wrap the entire function logic in the CORS handler.
     corsHandler(req, res, async () => {
         const apiKey = process.env.API_KEY;
@@ -141,8 +138,8 @@ export const geminiApiStream = onRequest(FUNCTION_CONFIG, (req: Request, res: Re
  * Securely downloads video content from a Gemini-provided URI.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Add explicit Express types for req and res to resolve compilation errors.
-export const downloadVideo = onRequest(FUNCTION_CONFIG, (req: Request, res: Response) => {
+// FIX: Removed explicit Express types from the handler. Type inference from `onRequest` provides the correct types for `req` and `res`, resolving compilation errors.
+export const downloadVideo = onRequest(FUNCTION_CONFIG, (req, res) => {
     // Wrap the entire function logic in the CORS handler.
     corsHandler(req, res, async () => {
         const apiKey = process.env.API_KEY;
