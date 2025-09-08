@@ -1,4 +1,5 @@
-import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+// FIX: Explicitly import Request and Response types to resolve type inference errors in onRequest handlers.
+import { onCall, onRequest, HttpsError, Request, Response } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { GoogleGenAI } from "@google/genai";
 import { Readable } from "stream";
@@ -61,21 +62,18 @@ export const geminiApiCall = onCall(FUNCTION_CONFIG, async (request) => {
  * Handles streaming text generation from the Gemini API.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Replaced Node.js http module methods with Express-like methods provided by firebase-functions/v2 onRequest.
-export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req, res) => {
+// FIX: Add explicit Request and Response types to the handler arguments.
+export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: Response) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
       console.error("CRITICAL: API_KEY secret is not loaded.");
-      // FIX: Use Express-style response methods.
       res.status(500).json({ error: "AI service is not configured on the server." });
       return;
     }
 
     // Manually verify user authentication for this `onRequest` function.
-    // FIX: Use Express-style request properties.
     const idToken = req.headers.authorization?.split("Bearer ")[1];
     if (!idToken) {
-        // FIX: Use Express-style response methods.
         res.status(401).json({ error: "Unauthorized. No authentication token provided." });
         return;
     }
@@ -83,23 +81,18 @@ export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, asy
         await admin.auth().verifyIdToken(idToken);
     } catch (error) {
         console.error("Error verifying auth token:", error);
-        // FIX: Use Express-style response methods.
         res.status(403).json({ error: "Forbidden. Invalid authentication token." });
         return;
     }
 
-    // FIX: Use Express-style request properties.
     if (req.method !== "POST") {
-      // FIX: Use Express-style response methods.
       res.status(405).json({ error: "Method Not Allowed. Please use POST." });
       return;
     }
 
     try {
-      // FIX: Use Express-style request properties.
       const { params } = req.body;
       if (!params) {
-        // FIX: Use Express-style response methods.
         res.status(400).json({ error: 'Bad Request: "params" are required.' });
         return;
       }
@@ -107,7 +100,6 @@ export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, asy
       const ai = new GoogleGenAI({ apiKey });
       const responseStream = await ai.models.generateContentStream(params);
       
-      // FIX: Use Express-style response methods.
       res.set("Content-Type", "text/plain; charset=utf-8");
       res.set("Cache-Control", "no-cache");
       res.set("Connection", "keep-alive");
@@ -117,20 +109,13 @@ export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, asy
           yield chunk.text;
         }
       }
-      // FIX: The Firebase `res` object is a writable stream. We can pipe to it.
       const stream = Readable.from(generate());
-      // FIX: Use .pipe() to stream data to the client, which also handles ending the response.
       stream.pipe(res);
     } catch (error: any) {
       console.error("Error in geminiApiStream:", error);
-      // FIX: Use Express-style response properties and methods.
       if (!res.headersSent) {
-        // FIX: Use Express-style response methods.
         res.status(500).json({ error: error.message });
       } else {
-        // If headers were already sent, we can't send a new status code.
-        // Just end the response to prevent the client from hanging.
-        // FIX: Use Express-style response methods.
         res.end();
       }
     }
@@ -140,43 +125,35 @@ export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, asy
  * Securely downloads video content from a Gemini-provided URI.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Replaced Node.js http module methods with Express-like methods provided by firebase-functions/v2 onRequest.
-export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req, res) => {
+// FIX: Add explicit Request and Response types to the handler arguments.
+export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: Response) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
         console.error("CRITICAL: API_KEY secret is not loaded.");
-        // FIX: Use Express-style response methods.
         res.status(500).json({ error: "AI service is not configured on the server." });
         return;
     }
 
-    // FIX: Use Express-style request properties.
     const idToken = req.headers.authorization?.split("Bearer ")[1];
     if (!idToken) {
-        // FIX: Use Express-style response methods.
         res.status(401).json({ error: "Unauthorized." });
         return;
     }
     try {
         await admin.auth().verifyIdToken(idToken);
     } catch (error) {
-        // FIX: Use Express-style response methods.
         res.status(403).json({ error: "Forbidden." });
         return;
     }
 
-    // FIX: Use Express-style request properties.
     if (req.method !== "POST") {
-        // FIX: Use Express-style response methods.
         res.status(405).json({ error: "Method Not Allowed." });
         return;
     }
 
     try {
-        // FIX: Use Express-style request properties.
         const { uri } = req.body;
         if (!uri) {
-            // FIX: Use Express-style response methods.
             res.status(400).json({ error: 'Bad Request: "uri" is required.' });
             return;
         }
@@ -187,32 +164,24 @@ export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async
         if (!videoResponse.ok || !videoResponse.body) {
             const errorText = await videoResponse.text();
             console.error(`Failed to fetch video. Status: ${videoResponse.status}`, errorText);
-            // FIX: Use Express-style response methods.
             res.status(videoResponse.status).json({ error: "Failed to fetch video from source." });
             return;
         }
         
-        // FIX: Use Express-style response methods.
         res.set("Content-Type", "video/mp4");
         const contentLength = videoResponse.headers.get("Content-Length");
         if (contentLength) {
-            // FIX: Use Express-style response methods.
             res.set("Content-Length", contentLength);
         }
         
-        // FIX: Stream the body from the fetch response directly to our function's response using pipe.
         const videoStream = Readable.fromWeb(videoResponse.body as any);
-        // FIX: Use .pipe() to stream data to the client, which also handles ending the response.
         videoStream.pipe(res);
 
     } catch (error: any) {
         console.error("Error in downloadVideo function:", error);
-        // FIX: Use Express-style response properties and methods.
         if (!res.headersSent) {
-            // FIX: Use Express-style response methods.
             res.status(500).json({ error: error.message || "An internal server error occurred." });
         } else {
-            // FIX: Use Express-style response methods.
             res.end();
         }
     }
