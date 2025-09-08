@@ -1,19 +1,16 @@
 import { Type, GenerateContentResponse } from "@google/genai";
 import { app, auth, firebaseConfig } from '../../lib/firebaseClient';
-// FIX: Use named imports for Firebase Functions to ensure correct module resolution.
-import { getFunctions, httpsCallable } from 'firebase/functions';
 
-// Initialize Firebase Functions and point to the correct region.
-const functionsInstance = getFunctions(app, 'us-central1');
-
-// Create a callable reference for non-streaming, JSON-based API calls.
-const geminiApiCall = httpsCallable(functionsInstance, 'geminiApiCall');
+// FIX: Removed `httpsCallable` and `getFunctions` imports to resolve module errors.
+// The API will be called directly via `fetch`.
 
 // Dynamically construct URLs to prevent config mismatches.
 const REGION = 'us-central1';
 if (!firebaseConfig.projectId) {
     throw new Error("Firebase projectId is not configured in firebaseClient.ts. The application cannot call backend functions.");
 }
+// FIX: Added URL for the geminiApiCall function.
+const GEMINI_API_CALL_URL = `https://${REGION}-${firebaseConfig.projectId}.cloudfunctions.net/geminiApiCall`;
 const GEMINI_STREAM_URL = `https://${REGION}-${firebaseConfig.projectId}.cloudfunctions.net/geminiApiStream`;
 const DOWNLOAD_VIDEO_URL = `https://${REGION}-${firebaseConfig.projectId}.cloudfunctions.net/downloadVideo`;
 
@@ -40,16 +37,40 @@ const getAuthToken = async (): Promise<string> => {
  * @returns {Promise<any>} The JSON response from the proxy.
  * @throws {Error} If the API call fails.
  */
+// FIX: Re-implemented callProxyApi using `fetch` instead of `httpsCallable`.
 const callProxyApi = async (endpoint: string, params: any): Promise<any> => {
     try {
-        const result = await geminiApiCall({ endpoint, params });
-        return result.data;
+        const token = await getAuthToken();
+        const response = await fetch(GEMINI_API_CALL_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            // Callable functions expect the payload to be wrapped in a 'data' object.
+            body: JSON.stringify({ data: { endpoint, params } }),
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            // Re-throw errors from the backend function to be caught by the retry logic.
+            const errorMessage = result.error?.message || 'The AI service failed to respond.';
+            const errorDetails = result.error?.details;
+            const enhancedError = new Error(errorMessage);
+            // @ts-ignore
+            enhancedError.context = { error: errorMessage, hint: errorDetails?.hint };
+            throw enhancedError;
+        }
+
+        // The actual data from an onCall function is in the 'result' property.
+        return result.result;
     } catch (error: any) {
         console.error("Firebase Functions call failed:", error);
-        // Create an error object that includes backend context if available for better debugging.
+        // Ensure error is in a consistent format for the caller.
         const enhancedError = new Error(error.message || 'The AI service failed to respond.');
         // @ts-ignore
-        enhancedError.context = { error: error.message, hint: error.details?.hint };
+        enhancedError.context = error.context || { error: error.message };
         throw enhancedError;
     }
 };
