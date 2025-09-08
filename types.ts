@@ -34,7 +34,7 @@ export interface Generation {
   created_at: string;
   tool_id: string;
   inputs: Record<string, string | File>;
-  output: GeneratedContentData;
+  output: GeneratedContentData | string;
 }
 
 export type ToastType = 'success' | 'error' | 'info';

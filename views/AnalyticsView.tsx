@@ -79,11 +79,11 @@ const AnalyticsView: React.FC = () => {
                     onClose={() => setSelectedHistoryItem(null)} 
                     title={findToolById(selectedHistoryItem.tool_id)?.nameKey ? t(findToolById(selectedHistoryItem.tool_id)!.nameKey) : 'Result'}
                 >
-                   {selectedHistoryItem.tool_id === 'video_generator' ? (
+                   {typeof selectedHistoryItem.output === 'string' ? (
                        <div>
                            <h3 className="text-lg font-semibold mb-2">Video Prompt</h3>
                            <p className="whitespace-pre-wrap p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
-                               {selectedHistoryItem.output as any as string}
+                               {selectedHistoryItem.output}
                            </p>
                        </div>
                    ) : (

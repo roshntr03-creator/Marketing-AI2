@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebaseClient';
-import { type Generation } from '../types';
+import { type Generation, type GeneratedContentData } from '../types';
 import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -39,24 +39,76 @@ export const useHistory = () => {
                     );
 
                     const querySnapshot = await getDocs(q);
-                    const firestoreHistory = querySnapshot.docs.map(doc => {
+                    const firestoreHistory: Generation[] = querySnapshot.docs.map(doc => {
                         const data = doc.data();
-                        // Firestore Timestamps need to be converted to a serializable format (ISO string)
                         const createdAtTimestamp = data.createdAt as Timestamp;
+                        
+                        // Robustly sanitize the output field to create a plain, serializable object.
+                        const sanitizeOutput = (output: any): GeneratedContentData | string => {
+                            if (typeof output === 'string') {
+                                return output; // Preserve string output for video prompts
+                            }
+                            if (!output || typeof output !== 'object') {
+                                return {
+                                    title: "Corrupted Content",
+                                    sections: [{ heading: "Error", content: "This historical result could not be displayed." }]
+                                };
+                            }
+                            // Rebuild the object to ensure it's a plain object
+                            const clean: GeneratedContentData = {
+                                title: String(output.title || 'Untitled'),
+                                sections: [],
+                            };
+                            if (Array.isArray(output.sections)) {
+                                clean.sections = output.sections.map((s: any) => ({
+                                    heading: String(s.heading || ''),
+                                    content: s.content, // content can be string or string[]
+                                }));
+                            }
+                            if (Array.isArray(output.sources)) {
+                                clean.sources = output.sources.map((s: any) => ({
+                                    uri: String(s.uri || ''),
+                                    title: String(s.title || ''),
+                                }));
+                            }
+                            return clean;
+                        };
+                        
+                        // Robustly sanitize the inputs field.
+                        const sanitizeInputs = (inputs: any): Record<string, string> => {
+                            if (!inputs || typeof inputs !== 'object') return {};
+                            const clean: Record<string, string> = {};
+                            Object.keys(inputs).forEach(key => {
+                                // Ensure value is a primitive before assigning
+                                const value = inputs[key];
+                                if (typeof value !== 'object' && value !== null) {
+                                    clean[key] = String(value);
+                                }
+                            });
+                            return clean;
+                        };
+
                         return {
                             id: doc.id,
                             created_at: createdAtTimestamp ? createdAtTimestamp.toDate().toISOString() : new Date().toISOString(),
-                            tool_id: data.tool_id,
-                            inputs: data.inputs,
-                            output: data.output,
-                        } as Generation;
+                            tool_id: String(data.tool_id || ''),
+                            inputs: sanitizeInputs(data.inputs),
+                            output: sanitizeOutput(data.output),
+                        };
                     });
 
                     setHistory(firestoreHistory);
                     localStorage.setItem(CACHE_KEY, JSON.stringify(firestoreHistory));
                 } catch (fetchError: any) {
                     console.error('Error fetching history:', fetchError);
-                    setError(fetchError.message);
+                    let userFriendlyError = "An error occurred while fetching your history.";
+                    // Provide a more helpful error for network issues.
+                    if (fetchError.code === 'unavailable') {
+                        userFriendlyError = "Could not connect to the server. Please check your internet connection. Your history may be out of date.";
+                    } else {
+                        userFriendlyError = fetchError.message;
+                    }
+                    setError(userFriendlyError);
                 } finally {
                     setLoading(false);
                 }

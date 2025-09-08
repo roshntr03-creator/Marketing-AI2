@@ -1,11 +1,16 @@
-import { Type, GenerateContentResponse } from "@google/genai";
-import { auth } from '../../lib/firebaseClient';
+import { Type, GenerateContentResponse, GoogleGenAI } from "@google/genai";
 
-export const UNAVAILABLE_ERROR = "The AI service is currently unavailable. Please contact the administrator.";
+export const UNAVAILABLE_ERROR = "The AI service is currently unavailable. Please check your API key and configuration.";
 
-// TODO: Replace with your deployed Firebase Function URLs
-const GEMINI_PROXY_URL = 'YOUR_FIREBASE_FUNCTION_URL/geminiProxy';
-const DOWNLOAD_VIDEO_URL = 'YOUR_FIREBASE_FUNCTION_URL/downloadVideo';
+// WARNING: This is an insecure method for storing an API key and is intended for development purposes only.
+// Anyone who can access your app can view this key.
+// It is highly recommended to use a backend proxy (like the original Firebase Function) for production.
+const API_KEY = "AIzaSyAnntvhw613jrh-XarcDtpJv7hhgx3z3jg";
+if (!API_KEY || API_KEY.includes("YOUR_API_KEY")) {
+    console.error("CRITICAL: Gemini API key is not configured.");
+}
+const ai = new GoogleGenAI({ apiKey: API_KEY });
+
 
 export const responseSchema = {
     type: Type.OBJECT,
@@ -64,45 +69,13 @@ const withRetry = async <T>(
     throw lastError;
 };
 
-const invokeFunction = async (endpoint: string, params: any) => {
-    const user = auth.currentUser;
-    if (!user) {
-        throw new Error("Authentication required.");
-    }
-
-    const idToken = await user.getIdToken();
-
-    const response = await fetch(GEMINI_PROXY_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ endpoint, params }),
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: response.statusText, hint: 'The server returned a non-JSON response.' }));
-        const err = new Error(errorData.error || 'An unknown server error occurred.');
-        (err as any).context = errorData;
-        throw err;
-    }
-    
-    // For streaming, we want the raw response body. For others, JSON.
-    if (endpoint.endsWith('Stream')) {
-        return response.body;
-    }
-
-    return response.json();
-};
-
 export const callGroundedGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void): Promise<GenerateContentResponse> => {
     const params = {
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: { tools: [{ googleSearch: {} }] },
     };
-    const apiCall = () => invokeFunction('generateContent', params);
+    const apiCall = () => ai.models.generateContent(params);
     return withRetry(apiCall, onRetry);
 };
 
@@ -113,19 +86,10 @@ export async function* callGroundedGenerationApiStream(prompt: string): AsyncGen
         config: { tools: [{ googleSearch: {} }] },
     };
     
-    const data = await invokeFunction('generateContentStream', params);
+    const responseStream = await ai.models.generateContentStream(params);
 
-    if (!(data instanceof ReadableStream)) {
-       throw new Error("Received an unexpected response type from the streaming function.");
-    }
-
-    const reader = data.getReader();
-    const decoder = new TextDecoder();
-    
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        yield decoder.decode(value);
+    for await (const chunk of responseStream) {
+        yield chunk.text;
     }
 }
 
@@ -139,7 +103,7 @@ export const callJsonGenerationApi = async (prompt: string, imageParts: any[], o
             responseSchema: responseSchema,
         },
     };
-    const apiCall = () => invokeFunction('generateContent', params);
+    const apiCall = () => ai.models.generateContent(params);
     return withRetry(apiCall, onRetry);
 };
 
@@ -151,8 +115,8 @@ export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeco
     };
     
     onStatusUpdate('generating_video');
-    const startGenerationCall = () => invokeFunction('generateVideos', startParams);
-    let { operation } = await withRetry(startGenerationCall, onRetry);
+    const startGenerationCall = () => ai.models.generateVideos(startParams);
+    let operation = await withRetry(startGenerationCall, onRetry);
 
     onStatusUpdate('processing_video');
     const MAX_POLLING_ATTEMPTS = 10;
@@ -161,15 +125,10 @@ export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeco
     while (operation && !operation.done) {
         await new Promise(resolve => setTimeout(resolve, 10000));
 
-        const checkStatusCall = () => invokeFunction('getVideosOperation', { operation });
+        const checkStatusCall = () => ai.operations.getVideosOperation({ operation });
         try {
-            const result = await withRetry(checkStatusCall, onRetry);
-            if (result && result.operation) {
-                operation = result.operation;
-                pollingFailures = 0; // Reset on success
-            } else {
-                throw new Error("Invalid polling response from server.");
-            }
+            operation = await withRetry(checkStatusCall, onRetry);
+            pollingFailures = 0; // Reset on success
         } catch (e) {
             pollingFailures++;
             console.warn(`Polling attempt ${pollingFailures}/${MAX_POLLING_ATTEMPTS} failed.`, e);
@@ -191,22 +150,11 @@ export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeco
     
     onStatusUpdate('video_ready');
     
-    const user = auth.currentUser;
-    if (!user) throw new Error("Authentication required for download.");
-    const idToken = await user.getIdToken();
-
-    const response = await fetch(DOWNLOAD_VIDEO_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ uri: downloadLink }),
-    });
-
+    // Fetch the video directly using the API key, convert to blob to hide key from URL
+    const response = await fetch(`${downloadLink}&key=${API_KEY}`);
 
     if (!response.ok) {
-        console.error("Failed to download video content via function");
+        console.error("Failed to download video content");
         throw new Error("Failed to download the generated video. Please check your network and try again.");
     }
 
