@@ -1,17 +1,60 @@
-import { Type, GenerateContentResponse, GoogleGenAI } from "@google/genai";
+import { Type, GenerateContentResponse } from "@google/genai";
+import { app, auth, firebaseConfig } from '../../lib/firebaseClient';
+// FIX: Use named imports for Firebase Functions to ensure correct module resolution.
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
-export const UNAVAILABLE_ERROR = "The AI service is currently unavailable. Please check your API key and configuration.";
+// Initialize Firebase Functions and point to the correct region.
+const functionsInstance = getFunctions(app, 'us-central1');
 
-// WARNING: This is an insecure method for storing an API key and is intended for development purposes only.
-// Anyone who can access your app can view this key.
-// It is highly recommended to use a backend proxy (like the original Firebase Function) for production.
-const API_KEY = "AIzaSyAnntvhw613jrh-XarcDtpJv7hhgx3z3jg";
-if (!API_KEY || API_KEY.includes("YOUR_API_KEY")) {
-    console.error("CRITICAL: Gemini API key is not configured.");
+// Create a callable reference for non-streaming, JSON-based API calls.
+const geminiApiCall = httpsCallable(functionsInstance, 'geminiApiCall');
+
+// Dynamically construct URLs to prevent config mismatches.
+const REGION = 'us-central1';
+if (!firebaseConfig.projectId) {
+    throw new Error("Firebase projectId is not configured in firebaseClient.ts. The application cannot call backend functions.");
 }
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+const GEMINI_STREAM_URL = `https://${REGION}-${firebaseConfig.projectId}.cloudfunctions.net/geminiApiStream`;
+const DOWNLOAD_VIDEO_URL = `https://${REGION}-${firebaseConfig.projectId}.cloudfunctions.net/downloadVideo`;
 
 
+/**
+ * Retrieves the Firebase authentication token for the current user.
+ * This is only needed for direct `fetch` calls, as `httpsCallable` handles it automatically.
+ * @returns {Promise<string>} The Firebase ID token.
+ * @throws {Error} If the user is not authenticated.
+ */
+const getAuthToken = async (): Promise<string> => {
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error("User not authenticated. Please log in again.");
+    }
+    // Force refresh the token to ensure it's not expired.
+    return await user.getIdToken(true);
+};
+
+/**
+ * A generic function to call the `geminiApiCall` Firebase Function for non-streaming requests.
+ * @param {string} endpoint The specific Gemini API endpoint to call (e.g., 'generateContent').
+ * @param {any} params The parameters to pass to the Gemini API.
+ * @returns {Promise<any>} The JSON response from the proxy.
+ * @throws {Error} If the API call fails.
+ */
+const callProxyApi = async (endpoint: string, params: any): Promise<any> => {
+    try {
+        const result = await geminiApiCall({ endpoint, params });
+        return result.data;
+    } catch (error: any) {
+        console.error("Firebase Functions call failed:", error);
+        // Create an error object that includes backend context if available for better debugging.
+        const enhancedError = new Error(error.message || 'The AI service failed to respond.');
+        // @ts-ignore
+        enhancedError.context = { error: error.message, hint: error.details?.hint };
+        throw enhancedError;
+    }
+};
+
+// This schema is still needed on the client to construct the request correctly.
 export const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -31,6 +74,7 @@ export const responseSchema = {
     required: ['title', 'sections']
 };
 
+// This utility is still needed on the client to process file uploads.
 export const fileToGenerativePart = async (file: File) => {
     const base64EncodedDataPromise = new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -42,6 +86,7 @@ export const fileToGenerativePart = async (file: File) => {
     };
 };
 
+// The retry wrapper is still a valuable client-side pattern.
 const withRetry = async <T>(
     apiCall: () => Promise<T>,
     onRetry: (delaySeconds: number) => void
@@ -54,7 +99,10 @@ const withRetry = async <T>(
             return await apiCall();
         } catch (err: any) {
             lastError = err;
-            if (err.message && (err.message.includes('RESOURCE_EXHAUSTED') || err.message.includes('429'))) {
+            const functionError = err.context?.error || err.message || '';
+            
+            // Check for rate limiting errors from either the proxy or Gemini itself.
+            if (functionError.includes('RESOURCE_EXHAUSTED') || functionError.includes('429')) {
                 if (attempt < MAX_RETRIES - 1) {
                     const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
                     const delaySeconds = Math.ceil(delay / 1000);
@@ -69,14 +117,16 @@ const withRetry = async <T>(
     throw lastError;
 };
 
+// --- Refactored API Functions ---
+
 export const callGroundedGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void): Promise<GenerateContentResponse> => {
     const params = {
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: { tools: [{ googleSearch: {} }] },
     };
-    const apiCall = () => ai.models.generateContent(params);
-    return withRetry(apiCall, onRetry);
+    const apiCall = () => callProxyApi('generateContent', params);
+    return withRetry(apiCall, onRetry) as Promise<GenerateContentResponse>;
 };
 
 export async function* callGroundedGenerationApiStream(prompt: string): AsyncGenerator<string> {
@@ -86,10 +136,32 @@ export async function* callGroundedGenerationApiStream(prompt: string): AsyncGen
         config: { tools: [{ googleSearch: {} }] },
     };
     
-    const responseStream = await ai.models.generateContentStream(params);
+    const token = await getAuthToken();
+    const response = await fetch(GEMINI_STREAM_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ params }), // The streaming endpoint now only needs params.
+    });
 
-    for await (const chunk of responseStream) {
-        yield chunk.text;
+    if (!response.ok || !response.body) {
+        const errorData = await response.json().catch(() => ({ error: 'Streaming API call failed with no body.' }));
+        throw new Error(errorData.error);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            yield decoder.decode(value, { stream: true });
+        }
+    } finally {
+        reader.releaseLock();
     }
 }
 
@@ -103,8 +175,8 @@ export const callJsonGenerationApi = async (prompt: string, imageParts: any[], o
             responseSchema: responseSchema,
         },
     };
-    const apiCall = () => ai.models.generateContent(params);
-    return withRetry(apiCall, onRetry);
+    const apiCall = () => callProxyApi('generateContent', params);
+    return withRetry(apiCall, onRetry) as Promise<GenerateContentResponse>;
 };
 
 export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void, onStatusUpdate: (status: string) => void) => {
@@ -115,8 +187,8 @@ export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeco
     };
     
     onStatusUpdate('generating_video');
-    const startGenerationCall = () => ai.models.generateVideos(startParams);
-    let operation = await withRetry(startGenerationCall, onRetry);
+    const startGenerationCall = () => callProxyApi('generateVideos', startParams);
+    let { operation } = await withRetry(startGenerationCall, onRetry);
 
     onStatusUpdate('processing_video');
     const MAX_POLLING_ATTEMPTS = 10;
@@ -125,9 +197,10 @@ export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeco
     while (operation && !operation.done) {
         await new Promise(resolve => setTimeout(resolve, 10000));
 
-        const checkStatusCall = () => ai.operations.getVideosOperation({ operation });
+        const checkStatusCall = () => callProxyApi('getVideosOperation', { operation });
         try {
-            operation = await withRetry(checkStatusCall, onRetry);
+            const result = await withRetry(checkStatusCall, onRetry);
+            operation = result.operation;
             pollingFailures = 0; // Reset on success
         } catch (e) {
             pollingFailures++;
@@ -150,8 +223,16 @@ export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeco
     
     onStatusUpdate('video_ready');
     
-    // Fetch the video directly using the API key, convert to blob to hide key from URL
-    const response = await fetch(`${downloadLink}&key=${API_KEY}`);
+    // The final download must still use fetch to get the blob data.
+    const token = await getAuthToken();
+    const response = await fetch(DOWNLOAD_VIDEO_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ uri: downloadLink }),
+    });
 
     if (!response.ok) {
         console.error("Failed to download video content");

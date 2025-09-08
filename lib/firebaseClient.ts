@@ -3,7 +3,8 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // This configuration has been updated with the user-provided Firebase project details.
-const firebaseConfig: FirebaseOptions = {
+// Exported to allow dynamic URL creation for Cloud Functions.
+export const firebaseConfig: FirebaseOptions = {
   apiKey: "AIzaSyBEyzPSErOgNiKUp8psz_stgooB4Bpzl2I",
   authDomain: "marketing-ai3-6f723.firebaseapp.com",
   projectId: "marketing-ai3-6f723",

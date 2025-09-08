@@ -2,17 +2,17 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { GoogleGenAI } from "@google/genai";
 import * as cors from "cors";
+import { Readable } from "stream";
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 
-// Initialize CORS middleware
+// Initialize CORS middleware for onRequest functions
 const corsHandler = cors({ origin: true });
 
 // Helper to get Gemini API key from environment configuration
 const getApiKey = (): string => {
   // In Firebase, secrets are exposed as environment variables.
-  // The key 'API_KEY' should be set using `firebase functions:secrets:set API_KEY`
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     console.error("CRITICAL: Gemini API key (API_KEY) is not configured in Firebase secrets.");
@@ -25,10 +25,52 @@ const getApiKey = (): string => {
   return apiKey;
 };
 
-// Main proxy function for Gemini API calls
-export const geminiProxy = functions.https.onRequest((req, res) => {
+// New `onCall` function for non-streaming, JSON-in/JSON-out communication.
+// `httpsCallable` from the client uses this, which handles auth and CORS automatically.
+// FIX: Using `any` for context type due to incorrect type resolution in the build environment.
+export const geminiApiCall = functions.https.onCall(async (data: any, context: any) => {
+  // Ensure the user is authenticated.
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+  }
+
+  try {
+    const { endpoint, params } = data;
+    if (!endpoint || !params) {
+      throw new functions.https.HttpsError("invalid-argument", 'The "endpoint" and "params" are required in the request data.');
+    }
+
+    const apiKey = getApiKey();
+    const ai = new GoogleGenAI({ apiKey });
+
+    // Route the call to the correct Gemini SDK method based on the endpoint.
+    switch (endpoint) {
+      case "generateVideos":
+        const videoOp = await ai.models.generateVideos(params);
+        return { operation: videoOp };
+      case "getVideosOperation":
+        const { operation: opParam } = params;
+        const statusOp = await ai.operations.getVideosOperation({ operation: opParam });
+        return { operation: statusOp };
+      case "generateContent":
+        const response = await ai.models.generateContent(params);
+        return response;
+      default:
+        throw new functions.https.HttpsError("not-found", `Unknown endpoint: ${endpoint}`);
+    }
+  } catch (error: any) {
+    console.error("Error in geminiApiCall function:", error);
+    // Re-throw as an HttpsError so the client gets a structured error.
+    throw new functions.https.HttpsError("internal", error.message, error.details);
+  }
+});
+
+
+// `onRequest` function dedicated to handling streaming API calls.
+// FIX: Using `any` for req and res types due to DOM type conflicts and incorrect type resolution in the build environment.
+export const geminiApiStream = functions.https.onRequest((req: any, res: any) => {
   corsHandler(req, res, async () => {
-    // Verify user authentication using Firebase Auth ID token
+    // Manually verify user authentication for this onRequest function.
     const idToken = req.headers.authorization?.split("Bearer ")[1];
     if (!idToken) {
         res.status(401).send({ error: "Unauthorized. No authentication token provided." });
@@ -48,66 +90,36 @@ export const geminiProxy = functions.https.onRequest((req, res) => {
     }
 
     try {
-      const { endpoint, params } = req.body;
-
-      if (!endpoint || !params) {
-        res.status(400).send({ error: 'Bad Request: "endpoint" and "params" are required.' });
+      const { params } = req.body;
+      if (!params) {
+        res.status(400).send({ error: 'Bad Request: "params" are required.' });
         return;
       }
 
       const apiKey = getApiKey();
       const ai = new GoogleGenAI({ apiKey });
 
-      // --- STREAMING ENDPOINT ---
-      if (endpoint === "generateContentStream") {
-        const responseStream = await ai.models.generateContentStream(params);
-        
-        res.setHeader("Content-Type", "text/plain; charset=utf-8");
-        res.setHeader("Cache-Control", "no-cache");
-        res.setHeader("Connection", "keep-alive");
+      const responseStream = await ai.models.generateContentStream(params);
+      
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
 
-        for await (const chunk of responseStream) {
-          res.write(chunk.text);
-        }
-        res.end();
-        return;
+      for await (const chunk of responseStream) {
+        res.write(chunk.text);
       }
-
-      // --- VIDEO GENERATION ENDPOINTS ---
-      if (endpoint === "generateVideos") {
-        const operation = await ai.models.generateVideos(params);
-        res.status(200).send({ operation });
-        return;
-      }
-
-      if (endpoint === "getVideosOperation") {
-        const { operation: operationParam } = params;
-        const operation = await ai.operations.getVideosOperation({ operation: operationParam });
-        res.status(200).send({ operation });
-        return;
-      }
-
-      // --- STANDARD NON-STREAMING ENDPOINT ---
-      if (endpoint === "generateContent") {
-        const response = await ai.models.generateContent(params);
-        res.status(200).send(response);
-        return;
-      }
-
-      res.status(400).send({ error: `Unknown endpoint: ${endpoint}` });
-
+      res.end();
     } catch (error: any) {
-      console.error("Error in geminiProxy function:", error);
-      const errorMessage = String(error?.message || error);
-      res.status(500).send({ error: errorMessage, hint: error?.details?.hint });
+      console.error("Error in geminiApiStream:", error);
+      res.status(500).send({ error: error.message });
     }
   });
 });
 
-// Function to download video content securely
-export const downloadVideo = functions.https.onRequest((req, res) => {
+// `onRequest` function to securely download video content.
+// FIX: Using `any` for req and res types due to DOM type conflicts and incorrect type resolution in the build environment.
+export const downloadVideo = functions.https.onRequest((req: any, res: any) => {
     corsHandler(req, res, async () => {
-        // Verify user authentication
         const idToken = req.headers.authorization?.split("Bearer ")[1];
         if (!idToken) {
             res.status(401).send({ error: "Unauthorized." });
@@ -135,7 +147,6 @@ export const downloadVideo = functions.https.onRequest((req, res) => {
             const apiKey = getApiKey();
             const videoUrl = `${uri}&key=${apiKey}`;
 
-            // Fetch the video from the Gemini API
             const videoResponse = await fetch(videoUrl);
 
             if (!videoResponse.ok || !videoResponse.body) {
@@ -145,15 +156,13 @@ export const downloadVideo = functions.https.onRequest((req, res) => {
                 return;
             }
 
-            // Stream the video back to the client
             res.setHeader("Content-Type", "video/mp4");
             const contentLength = videoResponse.headers.get("Content-Length");
             if (contentLength) {
                 res.setHeader("Content-Length", contentLength);
             }
             
-            const nodeStream = videoResponse.body as unknown as NodeJS.ReadableStream;
-            nodeStream.pipe(res);
+            Readable.fromWeb(videoResponse.body as any).pipe(res);
 
         } catch (error: any) {
             console.error("Error in downloadVideo function:", error);

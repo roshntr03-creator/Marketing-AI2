@@ -17,7 +17,9 @@
     "@supabase/supabase-js": "^2.57.2",
     "cors": "^2.8.5",
     "firebase-functions": "^6.4.0",
-    "firebase-admin": "^13.5.0"
+    "firebase-admin": "^13.5.0",
+    "webworker": "^0.8.4",
+    "stream": "^0.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
