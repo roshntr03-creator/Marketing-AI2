@@ -12,6 +12,11 @@
   },
   "compileOnSave": true,
   "include": [
-    "index.ts"
+    "index.ts",
+    "**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "lib"
   ]
 }
