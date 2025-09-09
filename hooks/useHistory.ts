@@ -32,13 +32,30 @@ export const useHistory = () => {
                 }
 
                 try {
-                    const q = query(
-                        collection(db, 'generations'),
-                        where('userId', '==', user.uid),
-                        orderBy('createdAt', 'desc')
-                    );
-
-                    const querySnapshot = await getDocs(q);
+                    let querySnapshot;
+                    
+                    try {
+                        // Try the optimized query with index first
+                        const q = query(
+                            collection(db, 'generations'),
+                            where('userId', '==', user.uid),
+                            orderBy('createdAt', 'desc')
+                        );
+                        querySnapshot = await getDocs(q);
+                    } catch (indexError: any) {
+                        // If index is missing, fall back to simple query without ordering
+                        if (indexError.code === 'failed-precondition' && indexError.message.includes('index')) {
+                            console.warn('Firestore index missing, using fallback query');
+                            const fallbackQ = query(
+                                collection(db, 'generations'),
+                                where('userId', '==', user.uid)
+                            );
+                            querySnapshot = await getDocs(fallbackQ);
+                        } else {
+                            throw indexError;
+                        }
+                    }
+                    
                     const firestoreHistory: Generation[] = querySnapshot.docs.map(doc => {
                         const data = doc.data();
                         const createdAtTimestamp = data.createdAt as Timestamp;
