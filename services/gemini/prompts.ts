@@ -14,28 +14,32 @@ export const getGroundedPrompt = (toolId: string, inputs: Record<string, string>
             break;
         case 'influencer_discovery':
             prompt = isArabic
-                ? `ابحث في الويب عن أفضل 5 مؤثرين نشطين في ${inputs.city} متخصصين في مجال ${inputs.field}. يجب أن تقدم لكل مؤثر المعلومات التالية بالضبط:
+                ? `أنت خبير تسويق رقمي متخصص في اكتشاف المؤثرين. بناءً على خبرتك وأحدث اتجاهات السوق في ${inputs.city}، قدم تحليلاً شاملاً لأفضل 5 مؤثرين في مجال ${inputs.field}. 
 
-**الاسم/المعرف:** اسم المؤثر ومعرفه على المنصة
-**المنصة الرئيسية:** (انستغرام، تيك توك، يوتيوب، إلخ)
-**عدد المتابعين:** العدد التقريبي للمتابعين
-**رابط الصفحة:** الرابط المباشر لصفحة المؤثر (مثل: instagram.com/username)
-**وصف المحتوى:** وصف موجز لنوع المحتوى الذي ينشره
-**سبب الاختيار:** لماذا هو مناسب لمجال ${inputs.field}
-**معدل التفاعل:** تقدير لمعدل التفاعل مع منشوراته
+لكل مؤثر، قدم:
 
-ابحث عن مؤثرين حقيقيين موجودين فعلاً ولديهم حسابات نشطة. لا تقل أنك لا تستطيع العثور على المعلومات - ابحث واعطني أسماء وتفاصيل محددة.`
-                : `Search the web for the top 5 active influencers in ${inputs.city} specializing in ${inputs.field}. You must provide the following information for each influencer exactly:
+## المؤثر الأول
+**الاسم:** [اسم المؤثر]
+**المنصة الرئيسية:** [انستغرام/تيك توك/يوتيوب]
+**نطاق المتابعين:** [مثل: 50K-100K أو 100K-500K]
+**نوع المحتوى:** [وصف المحتوى الذي ينشره]
+**نقاط القوة:** [لماذا هو مؤثر فعال في ${inputs.field}]
+**استراتيجية التعاون:** [كيف يمكن التعاون معه]
 
-**Name/Handle:** The influencer's name and platform handle
-**Main Platform:** (Instagram, TikTok, YouTube, etc.)
-**Follower Count:** Approximate number of followers
-**Profile Link:** Direct link to the influencer's profile (e.g., instagram.com/username)
-**Content Description:** Brief description of the type of content they create
-**Why They're a Good Fit:** Explanation of why they suit the ${inputs.field} niche
-**Engagement Rate:** Estimated engagement rate on their posts
+كرر هذا التنسيق للمؤثرين الخمسة. ركز على تقديم نصائح عملية حول كيفية العثور على هؤلاء المؤثرين والتعاون معهم في ${inputs.city}.`
+                : `You are a digital marketing expert specializing in influencer discovery. Based on your expertise and latest market trends in ${inputs.city}, provide a comprehensive analysis of the top 5 influencers in the ${inputs.field} niche.
 
-Find real influencers who actually exist and have active accounts. Don't say you can't find the information - search and give me specific names and details.`;
+For each influencer, provide:
+
+## Influencer #1
+**Name:** [Influencer name]
+**Primary Platform:** [Instagram/TikTok/YouTube]
+**Follower Range:** [e.g., 50K-100K or 100K-500K]
+**Content Type:** [Description of content they create]
+**Strengths:** [Why they're effective in ${inputs.field}]
+**Collaboration Strategy:** [How to work with them]
+
+Repeat this format for all five influencers. Focus on providing practical advice on how to find and collaborate with these influencers in ${inputs.city}.`;
             title = isArabic ? `مؤثرون في ${inputs.city} لمجال ${inputs.field}` : `Influencers in ${inputs.city} for ${inputs.field}`;
             break;
         case 'social_media_optimizer':
