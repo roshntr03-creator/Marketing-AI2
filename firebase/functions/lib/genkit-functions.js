@@ -102,7 +102,7 @@ exports.generateStreamingContentFlow = (0, functions_1.onFlow)({
     const { prompt, model = 'gemini-1.5-flash', config = {} } = input;
     const selectedModel = model === 'gemini-1.5-pro' ? googleai_1.gemini15Pro : googleai_1.gemini15Flash;
     const { generateStream } = await Promise.resolve().then(() => __importStar(require('@genkit-ai/ai')));
-    const response = generateStream({
+    const response = await generateStream({
         model: selectedModel,
         prompt: prompt,
         config: {
