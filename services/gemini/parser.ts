@@ -1,5 +1,5 @@
 import { GenerateContentResponse } from "@google/genai";
-import { GeneratedContentData } from "../../types";
+import { GeneratedContentData } from "../../types.ts";
 
 export const processJsonResponse = (response: GenerateContentResponse): GeneratedContentData => {
     try {

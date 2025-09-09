@@ -1,5 +1,5 @@
 import { Type, GenerateContentResponse } from "@google/genai";
-import { app, auth, firebaseConfig } from '../../lib/firebaseClient';
+import { app, auth, firebaseConfig } from '../../lib/firebaseClient.ts';
 
 // FIX: Removed `httpsCallable` and `getFunctions` imports to resolve module errors.
 // The API will be called directly via `fetch`.

@@ -1,4 +1,4 @@
-import { Language } from "../../types";
+import { Language } from "../../types.ts";
 
 export const getGroundedPrompt = (toolId: string, inputs: Record<string, string>, language: Language): { prompt: string, title: string } => {
     let prompt = '';

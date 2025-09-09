@@ -13,22 +13,19 @@
     ],
     "headers": [
       {
-        "source": "**/*.tsx",
+        "source": "**/*.{tsx,ts}",
         "headers": [
           {
             "key": "Content-Type",
             "value": "application/javascript; charset=utf-8"
           }
         ]
-      },
+      }
+    ],
+    "rewrites": [
       {
-        "source": "**/*.ts",
-        "headers": [
-          {
-            "key": "Content-Type",
-            "value": "application/javascript; charset=utf-8"
-          }
-        ]
+        "source": "**",
+        "destination": "/index.html"
       }
     ]
   }

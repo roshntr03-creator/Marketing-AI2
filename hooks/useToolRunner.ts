@@ -1,11 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
-import { type Tool, type GeneratedContentData, type Generation } from '../types';
-import { useLocalization } from './useLocalization';
-import { generateContentForTool, generateVideo } from '../services/geminiService';
-import { triggerHapticFeedback } from '../lib/haptics';
-import { useToasts } from './useToasts';
-import { useAuth } from './useAuth';
-import { db } from '../lib/firebaseClient';
+import { type Tool, type GeneratedContentData, type Generation } from '../types.ts';
+import { useLocalization } from './useLocalization.ts';
+import { generateContentForTool, generateVideo } from '../services/geminiService.ts';
+import { triggerHapticFeedback } from '../lib/haptics.ts';
+import { useToasts } from './useToasts.ts';
+import { useAuth } from './useAuth.ts';
+import { db } from '../lib/firebaseClient.ts';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const CACHE_KEY = 'generationHistory';

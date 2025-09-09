@@ -1,7 +1,7 @@
 import React from 'react';
-import { type Generation, type Tool } from '../types';
-import { useLocalization } from '../hooks/useLocalization';
-import { triggerHapticFeedback } from '../lib/haptics';
+import { type Generation, type Tool } from '../types.ts';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import { triggerHapticFeedback } from '../lib/haptics.ts';
 
 interface HistoryItemProps {
     generation: Generation;

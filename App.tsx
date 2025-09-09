@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { type Theme, type Language } from './types';
-import { LanguageContext } from './hooks/useLocalization';
-import { ThemeContext } from './hooks/useTheme';
-import translations from './i18n/translations';
-import LoginView from './views/LoginView';
-import DashboardView from './views/DashboardView';
-import ToolsView from './views/ToolsView';
-import AnalyticsView from './views/AnalyticsView';
-import SettingsView from './views/SettingsView';
-import BottomNavBar from './components/BottomNavBar';
-import LoadingSpinner from './components/LoadingSpinner';
-import { useAuth } from './hooks/useAuth';
-import { auth } from './lib/firebaseClient';
+import { type Theme, type Language } from './types.ts';
+import { LanguageContext } from './hooks/useLocalization.ts';
+import { ThemeContext } from './hooks/useTheme.ts';
+import translations from './i18n/translations.ts';
+import LoginView from './views/LoginView.tsx';
+import DashboardView from './views/DashboardView.tsx';
+import ToolsView from './views/ToolsView.tsx';
+import AnalyticsView from './views/AnalyticsView.tsx';
+import SettingsView from './views/SettingsView.tsx';
+import BottomNavBar from './components/BottomNavBar.tsx';
+import LoadingSpinner from './components/LoadingSpinner.tsx';
+import { useAuth } from './hooks/useAuth.ts';
+import { auth } from './lib/firebaseClient.ts';
 import { signOut } from 'firebase/auth';
-import { ToastProvider } from './components/ToastProvider';
+import { ToastProvider } from './components/ToastProvider.tsx';
 
 type View = 'dashboard' | 'tools' | 'analytics' | 'settings';
 

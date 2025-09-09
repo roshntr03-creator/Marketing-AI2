@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { type User } from '../types';
-import { auth } from '../lib/firebaseClient';
+import { type User } from '../types.ts';
+import { auth } from '../lib/firebaseClient.ts';
 import { updateProfile, updatePassword } from 'firebase/auth';
-import { useToasts } from './useToasts';
-import { useLocalization } from './useLocalization';
+import { useToasts } from './useToasts.ts';
+import { useLocalization } from './useLocalization.ts';
 
 export const useSettings = (user: User | null) => {
   const { addToast } = useToasts();

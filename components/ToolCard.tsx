@@ -1,7 +1,7 @@
 import React from 'react';
-import { type Tool } from '../types';
-import { useLocalization } from '../hooks/useLocalization';
-import { useTheme } from '../hooks/useTheme';
+import { type Tool } from '../types.ts';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import { useTheme } from '../hooks/useTheme.ts';
 
 interface ToolCardProps {
   tool: Tool;

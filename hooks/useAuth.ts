@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { auth } from '../lib/firebaseClient';
+import { auth } from '../lib/firebaseClient.ts';
 import { type User, onAuthStateChanged } from 'firebase/auth';
-import { type AuthContextType } from '../types';
+import { type AuthContextType } from '../types.ts';
 
 export const useAuth = (): AuthContextType => {
   const [user, setUser] = useState<User | null>(null);

@@ -1,11 +1,11 @@
 import React from 'react';
-import { type Tool, type InputField } from '../types';
-import { useLocalization } from '../hooks/useLocalization';
-import LoadingSpinner from '../components/LoadingSpinner';
-import GeneratedContent from '../components/GeneratedContent';
-import LottieAnimation from '../components/LottieAnimation';
-import { useToolRunner } from '../hooks/useToolRunner';
-import ImageUpload from '../components/ImageUpload';
+import { type Tool, type InputField } from '../types.ts';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import LoadingSpinner from '../components/LoadingSpinner.tsx';
+import GeneratedContent from '../components/GeneratedContent.tsx';
+import LottieAnimation from '../components/LottieAnimation.tsx';
+import { useToolRunner } from '../hooks/useToolRunner.ts';
+import ImageUpload from '../components/ImageUpload.tsx';
 
 interface ToolRunnerViewProps {
   tool: Tool;

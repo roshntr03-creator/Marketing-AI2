@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { auth } from '../lib/firebaseClient';
+import { auth } from '../lib/firebaseClient.ts';
 import {
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
 } from 'firebase/auth';
-import { useLocalization } from '../hooks/useLocalization';
-import Logo from '../components/Logo';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import Logo from '../components/Logo.tsx';
 
 const LoginView: React.FC = () => {
   const { t } = useLocalization();

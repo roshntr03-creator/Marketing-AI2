@@ -1,6 +1,7 @@
 
+
 import React, { useEffect } from 'react';
-import { useLocalization } from '../hooks/useLocalization';
+import { useLocalization } from '../hooks/useLocalization.ts';
 
 interface ModalProps {
   isOpen: boolean;

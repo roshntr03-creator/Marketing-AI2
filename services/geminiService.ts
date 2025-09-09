@@ -1,13 +1,13 @@
-import { GeneratedContentData, Language } from "../types";
+import { GeneratedContentData, Language } from "../types.ts";
 import { 
     callGroundedGenerationApi, 
     callGroundedGenerationApiStream,
     callJsonGenerationApi, 
     callVideoGenerationApi,
     fileToGenerativePart
-} from './gemini/api';
-import { getGroundedPrompt, getJsonPrompt, getVideoPrompt } from './gemini/prompts';
-import { processGroundedResponse, processJsonResponse } from './gemini/parser';
+} from './gemini/api.ts';
+import { getGroundedPrompt, getJsonPrompt, getVideoPrompt } from './gemini/prompts.ts';
+import { processGroundedResponse, processJsonResponse } from './gemini/parser.ts';
 
 const groundedTools = ['seo_assistant', 'influencer_discovery', 'social_media_optimizer'];
 

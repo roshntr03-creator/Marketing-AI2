@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { auth, db } from '../lib/firebaseClient';
-import { type Generation, type GeneratedContentData } from '../types';
+import { auth, db } from '../lib/firebaseClient.ts';
+import { type Generation, type GeneratedContentData } from '../types.ts';
 import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 

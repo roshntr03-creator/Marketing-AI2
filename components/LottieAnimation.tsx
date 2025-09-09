@@ -1,7 +1,7 @@
 import React from 'react';
 import Lottie from 'lottie-react';
-import animationData from '../assets/generatingAnimation';
-import { useLocalization } from '../hooks/useLocalization';
+import animationData from '../assets/generatingAnimation.ts';
+import { useLocalization } from '../hooks/useLocalization.ts';
 
 const LottieAnimation: React.FC = () => {
     const { t } = useLocalization();

@@ -1,10 +1,11 @@
 
+
 import React, { useState, useMemo } from 'react';
-import { type Tool } from '../types';
-import { TOOLS } from '../constants';
-import { useLocalization } from '../hooks/useLocalization';
-import ToolCard from '../components/ToolCard';
-import ToolRunnerView from './ToolRunnerView';
+import { type Tool } from '../types.ts';
+import { TOOLS } from '../constants.ts';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import ToolCard from '../components/ToolCard.tsx';
+import ToolRunnerView from './ToolRunnerView.tsx';
 
 const ToolsView: React.FC = () => {
   const { t } = useLocalization();

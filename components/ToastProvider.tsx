@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { ToastContext } from '../hooks/useToasts';
-import { type Toast, type ToastType } from '../types';
+import { ToastContext } from '../hooks/useToasts.ts';
+import { type Toast, type ToastType } from '../types.ts';
 
 interface ToastProviderProps {
   children: React.ReactNode;

@@ -1,8 +1,9 @@
 
+
 import React, { useState } from 'react';
-import { type GeneratedContentData } from '../types';
-import { useLocalization } from '../hooks/useLocalization';
-import Modal from './Modal';
+import { type GeneratedContentData } from '../types.ts';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import Modal from './Modal.tsx';
 
 interface GeneratedContentProps {
   data: GeneratedContentData;

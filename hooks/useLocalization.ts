@@ -1,6 +1,7 @@
 
+
 import { createContext, useContext } from 'react';
-import { type Language } from '../types';
+import { type Language } from '../types.ts';
 
 interface LanguageContextType {
   language: Language;

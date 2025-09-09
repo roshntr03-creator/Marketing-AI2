@@ -1,10 +1,10 @@
 import React from 'react';
-import { useLocalization } from '../hooks/useLocalization';
-import { useAuth } from '../hooks/useAuth';
-import { TOOLS } from '../constants';
-import ToolCard from '../components/ToolCard';
-import { type Tool } from '../types';
-import { triggerHapticFeedback } from '../lib/haptics';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import { useAuth } from '../hooks/useAuth.ts';
+import { TOOLS } from '../constants.ts';
+import ToolCard from '../components/ToolCard.tsx';
+import { type Tool } from '../types.ts';
+import { triggerHapticFeedback } from '../lib/haptics.ts';
 
 interface DashboardViewProps {
   setCurrentView: (view: 'dashboard' | 'tools' | 'analytics' | 'settings') => void;

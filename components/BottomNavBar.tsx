@@ -1,7 +1,8 @@
 
+
 import React from 'react';
-import { useLocalization } from '../hooks/useLocalization';
-import { triggerHapticFeedback } from '../lib/haptics';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import { triggerHapticFeedback } from '../lib/haptics.ts';
 
 type View = 'dashboard' | 'tools' | 'analytics' | 'settings';
 

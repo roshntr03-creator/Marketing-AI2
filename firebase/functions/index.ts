@@ -1,5 +1,8 @@
-// FIX: Explicitly import Request and Response types to resolve type inference errors in onRequest handlers.
-import { onCall, onRequest, HttpsError, Request, Response } from "firebase-functions/v2/https";
+// FIX: The Response type is imported from 'express' for v2 onRequest handlers.
+// The Request type is aliased to HttpsRequest to avoid conflicts with global DOM types.
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import type { Request as HttpsRequest } from "firebase-functions/v2/https";
+import type { Response } from "express";
 import * as admin from "firebase-admin";
 import { GoogleGenAI } from "@google/genai";
 import { Readable } from "stream";
@@ -62,8 +65,8 @@ export const geminiApiCall = onCall(FUNCTION_CONFIG, async (request) => {
  * Handles streaming text generation from the Gemini API.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Add explicit Request and Response types to the handler arguments.
-export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: Response) => {
+// FIX: Use the aliased `HttpsRequest` type and the correct `Response` type for the handler arguments.
+export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: HttpsRequest, res: Response) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
       console.error("CRITICAL: API_KEY secret is not loaded.");
@@ -125,8 +128,8 @@ export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, asy
  * Securely downloads video content from a Gemini-provided URI.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Add explicit Request and Response types to the handler arguments.
-export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: Response) => {
+// FIX: Use the aliased `HttpsRequest` type and the correct `Response` type for the handler arguments.
+export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: HttpsRequest, res: Response) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
         console.error("CRITICAL: API_KEY secret is not loaded.");

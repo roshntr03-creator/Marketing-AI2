@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { useLocalization } from '../hooks/useLocalization';
-import { type Generation, type Tool } from '../types';
-import HistoryItem from '../components/HistoryItem';
-import Modal from '../components/Modal';
-import GeneratedContent from '../components/GeneratedContent';
-import AnalyticsChart from '../components/AnalyticsChart';
-import HistoryItemSkeleton from '../components/HistoryItemSkeleton';
-import { TOOLS } from '../constants';
-import { useHistory } from '../hooks/useHistory';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import { type Generation, type Tool } from '../types.ts';
+import HistoryItem from '../components/HistoryItem.tsx';
+import Modal from '../components/Modal.tsx';
+import GeneratedContent from '../components/GeneratedContent.tsx';
+import AnalyticsChart from '../components/AnalyticsChart.tsx';
+import HistoryItemSkeleton from '../components/HistoryItemSkeleton.tsx';
+import { TOOLS } from '../constants.ts';
+import { useHistory } from '../hooks/useHistory.ts';
 
 const AnalyticsView: React.FC = () => {
     const { t } = useLocalization();

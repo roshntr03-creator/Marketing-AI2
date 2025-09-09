@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useTheme } from '../hooks/useTheme';
-import { useLocalization } from '../hooks/useLocalization';
-import { type User } from '../types';
-import { useSettings } from '../hooks/useSettings';
-import Modal from '../components/Modal';
+import { useTheme } from '../hooks/useTheme.ts';
+import { useLocalization } from '../hooks/useLocalization.ts';
+import { type User } from '../types.ts';
+import { useSettings } from '../hooks/useSettings.ts';
+import Modal from '../components/Modal.tsx';
 
 interface SettingsViewProps {
   user: User | null;
