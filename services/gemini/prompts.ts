@@ -14,8 +14,28 @@ export const getGroundedPrompt = (toolId: string, inputs: Record<string, string>
             break;
         case 'influencer_discovery':
             prompt = isArabic
-                ? `بناءً على أحدث نتائج بحث الويب، ابحث عن أفضل 5 مؤثرين محليين في ${inputs.city} في مجال ${inputs.field}. لكل مؤثر، قدم اسمه/معرفه، ووصفًا موجزًا لمحتواه، ولماذا هو مناسب. قدم النتيجة بتنسيق ماركداون واضح وسهل القراءة.`
-                : `Based on the latest web search results, find the top 5 local influencers in ${inputs.city} for the ${inputs.field} niche. For each influencer, provide their name/handle, a brief description of their content, and why they are a good fit. Present the result in a clear, easy-to-read markdown format.`;
+                ? `بناءً على أحدث نتائج بحث الويب، ابحث عن أفضل 5 مؤثرين محليين في ${inputs.city} في مجال ${inputs.field}. لكل مؤثر، قدم المعلومات التالية بتنسيق واضح:
+
+**الاسم/المعرف:** اسم المؤثر ومعرفه على المنصة
+**المنصة الرئيسية:** (انستغرام، تيك توك، يوتيوب، إلخ)
+**عدد المتابعين:** العدد التقريبي للمتابعين
+**رابط الصفحة:** الرابط المباشر لصفحة المؤثر
+**وصف المحتوى:** وصف موجز لنوع المحتوى الذي ينشره
+**سبب الاختيار:** لماذا هو مناسب لمجال ${inputs.field}
+**معدل التفاعل:** تقدير لمعدل التفاعل مع منشوراته
+
+قدم النتيجة بتنسيق ماركداون منظم وسهل القراءة.`
+                : `Based on the latest web search results, find the top 5 local influencers in ${inputs.city} for the ${inputs.field} niche. For each influencer, provide the following information in a clear format:
+
+**Name/Handle:** The influencer's name and platform handle
+**Main Platform:** (Instagram, TikTok, YouTube, etc.)
+**Follower Count:** Approximate number of followers
+**Profile Link:** Direct link to the influencer's profile
+**Content Description:** Brief description of the type of content they create
+**Why They're a Good Fit:** Explanation of why they suit the ${inputs.field} niche
+**Engagement Rate:** Estimated engagement rate on their posts
+
+Present the result in a well-organized, easy-to-read markdown format.`;
             title = isArabic ? `مؤثرون في ${inputs.city} لمجال ${inputs.field}` : `Influencers in ${inputs.city} for ${inputs.field}`;
             break;
         case 'social_media_optimizer':
