@@ -1,19 +1,18 @@
 import { Type, GenerateContentResponse } from "@google/genai";
 import { app, auth, firebaseConfig } from '../../lib/firebaseClient.ts';
+import { httpsCallable, getFunctions } from 'firebase/functions';
 
-// FIX: Removed `httpsCallable` and `getFunctions` imports to resolve module errors.
-// The API will be called directly via `fetch`.
+// Initialize Firebase Functions
+const functions = getFunctions(app, 'us-central1');
 
 // Dynamically construct URLs to prevent config mismatches.
-const REGION = 'us-central1';
 if (!firebaseConfig.projectId) {
     throw new Error("Firebase projectId is not configured in firebaseClient.ts. The application cannot call backend functions.");
 }
-// FIX: Added URL for the geminiApiCall function.
-const GEMINI_API_CALL_URL = `https://${REGION}-${firebaseConfig.projectId}.cloudfunctions.net/geminiApiCall`;
-const GEMINI_STREAM_URL = `https://${REGION}-${firebaseConfig.projectId}.cloudfunctions.net/geminiApiStream`;
-const DOWNLOAD_VIDEO_URL = `https://${REGION}-${firebaseConfig.projectId}.cloudfunctions.net/downloadVideo`;
 
+// Firebase Functions
+const geminiApiCall = httpsCallable(functions, 'geminiApiCall');
+const downloadVideo = httpsCallable(functions, 'downloadVideo');
 
 /**
  * Retrieves the Firebase authentication token for the current user.
@@ -37,44 +36,15 @@ const getAuthToken = async (): Promise<string> => {
  * @returns {Promise<any>} The JSON response from the proxy.
  * @throws {Error} If the API call fails.
  */
-// FIX: Re-implemented callProxyApi using `fetch` instead of `httpsCallable`.
 const callProxyApi = async (endpoint: string, params: any): Promise<any> => {
     try {
-        const token = await getAuthToken();
-        
         // التحقق من صحة المعاملات
         if (!endpoint || typeof endpoint !== 'string') {
             throw new Error('Invalid endpoint provided');
         }
         
-        const response = await fetch(GEMINI_API_CALL_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-            },
-            // Callable functions expect the payload to be wrapped in a 'data' object.
-            body: JSON.stringify({ data: { endpoint, params } }),
-        });
-        
-        if (!response) {
-            throw new Error('No response received from server');
-        }
-        
-        const result = await response.json();
-        
-        if (!response.ok) {
-            // Re-throw errors from the backend function to be caught by the retry logic.
-            const errorMessage = result.error?.message || 'The AI service failed to respond.';
-            const errorDetails = result.error?.details;
-            const enhancedError = new Error(errorMessage);
-            // @ts-ignore
-            enhancedError.context = { error: errorMessage, hint: errorDetails?.hint };
-            throw enhancedError;
-        }
-
-        // The actual data from an onCall function is in the 'result' property.
-        return result.result;
+        const result = await geminiApiCall({ endpoint, params });
+        return result.data;
     } catch (error: any) {
         console.error("Firebase Functions call failed:", error);
         
@@ -170,20 +140,22 @@ export const callGroundedGenerationApi = async (prompt: string, onRetry: (delayS
 };
 
 export async function* callGroundedGenerationApiStream(prompt: string): AsyncGenerator<string> {
-    const params = {
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: { tools: [{ googleSearch: {} }] },
-    };
+    const STREAM_URL = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/geminiApiStream`;
     
     const token = await getAuthToken();
-    const response = await fetch(GEMINI_STREAM_URL, {
+    const response = await fetch(STREAM_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ params }), // The streaming endpoint now only needs params.
+        body: JSON.stringify({ 
+            params: {
+                model: 'gemini-1.5-flash',
+                contents: prompt,
+                config: { tools: [{ googleSearch: {} }] }
+            }
+        }),
     });
 
     if (!response.ok || !response.body) {
@@ -220,70 +192,6 @@ export const callJsonGenerationApi = async (prompt: string, imageParts: any[], o
 };
 
 export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeconds: number) => void, onStatusUpdate: (status: string) => void) => {
-    const startParams = {
-        model: 'veo-2.0-generate-001',
-        prompt: prompt,
-        config: { numberOfVideos: 1 }
-    };
-    
-    onStatusUpdate('generating_video');
-    const startGenerationCall = () => callProxyApi('generateVideos', startParams);
-    let { operation } = await withRetry(startGenerationCall, onRetry);
-
-    // Validate that operation has a valid name property
-    if (!operation || !operation.name || typeof operation.name !== 'string') {
-        throw new Error('Video generation failed: Invalid operation returned from server');
-    }
-
-    onStatusUpdate('processing_video');
-    const MAX_POLLING_ATTEMPTS = 10;
-    let pollingFailures = 0;
-
-    while (operation && !operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000));
-
-        const checkStatusCall = () => callProxyApi('getVideosOperation', { operation });
-        try {
-            const result = await withRetry(checkStatusCall, onRetry);
-            operation = result.operation;
-            pollingFailures = 0; // Reset on success
-        } catch (e) {
-            pollingFailures++;
-            console.warn(`Polling attempt ${pollingFailures}/${MAX_POLLING_ATTEMPTS} failed.`, e);
-            if (pollingFailures >= MAX_POLLING_ATTEMPTS) {
-                throw new Error("Video status check failed too many times. Please try again later.");
-            }
-        }
-    }
-    
-    if (!operation?.done) {
-        throw new Error("Video generation did not complete successfully or was aborted.");
-    }
-
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-
-    if (!downloadLink) {
-        throw new Error("Video generation failed or returned no link.");
-    }
-    
-    onStatusUpdate('video_ready');
-    
-    // The final download must still use fetch to get the blob data.
-    const token = await getAuthToken();
-    const response = await fetch(DOWNLOAD_VIDEO_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ uri: downloadLink }),
-    });
-
-    if (!response.ok) {
-        console.error("Failed to download video content");
-        throw new Error("Failed to download the generated video. Please check your network and try again.");
-    }
-
-    const videoBlob = await response.blob();
-    return URL.createObjectURL(videoBlob);
+    // Video generation is not implemented yet
+    throw new Error('Video generation feature is coming soon!');
 };
