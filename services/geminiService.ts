@@ -1,11 +1,9 @@
 import { GeneratedContentData, Language } from "../types.ts";
 import { 
-    callGroundedGenerationApi, 
-    callGroundedGenerationApiStream,
-    callJsonGenerationApi, 
-    callVideoGenerationApi,
-    fileToGenerativePart
-} from './gemini/api.ts';
+    callGenkitGenerateContent,
+    callGenkitGenerateStreamingContent,
+    callGenkitGenerateVideo
+} from './genkit/api.ts';
 import { getGroundedPrompt, getJsonPrompt, getVideoPrompt } from './gemini/prompts.ts';
 import { processGroundedResponse, processJsonResponse } from './gemini/parser.ts';
 
@@ -34,43 +32,30 @@ export const generateContentForTool = async (
         const { prompt, title } = getGroundedPrompt(toolId, textInputs, language);
 
         if (onStreamUpdate) {
-            const streamGenerator = callGroundedGenerationApiStream(prompt);
+            const streamGenerator = callGenkitGenerateStreamingContent(prompt, {
+                tools: [{ googleSearch: {} }]
+            });
             let fullText = '';
             for await (const chunk of streamGenerator) {
                 onStreamUpdate(chunk);
                 fullText += chunk;
             }
             const processedResult = processGroundedResponse(fullText, title);
-            
-            // After streaming, make a non-blocking call to get grounding sources
-            // to enhance the final result without delaying the initial text display.
-            callGroundedGenerationApi(prompt, () => {}).then(metadataResponse => {
-                const sources = metadataResponse.candidates?.[0]?.groundingMetadata?.groundingChunks
-                    ?.map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }))
-                    .filter(source => source.uri && source.title);
-                if (sources && sources.length > 0) {
-                    // This part of the logic would require a way to update the state in useToolRunner
-                    // For simplicity and to avoid complex state management, we will omit adding sources post-stream for now.
-                    // A more advanced implementation could use a callback to update the final content with sources.
-                }
-            }).catch(e => console.error("Could not fetch sources for streamed content:", e));
-
             return processedResult;
         } else {
-            const response = await callGroundedGenerationApi(prompt, onRetry);
+            const response = await callGenkitGenerateContent(prompt, {
+                tools: [{ googleSearch: {} }]
+            });
             const textResponse = response.text;
             const generatedData = processGroundedResponse(textResponse, title);
-            const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-                ?.map((chunk: any) => ({ uri: chunk.web.uri, title: chunk.web.title }))
-                .filter(source => source.uri && source.title);
-            generatedData.sources = sources;
             return generatedData;
         }
     }
 
-    const imageParts = await Promise.all(fileInputs.map(fileToGenerativePart));
     const prompt = getJsonPrompt(toolId, textInputs, language, imageParts.length > 0);
-    const response = await callJsonGenerationApi(prompt, imageParts, onRetry);
+    const response = await callGenkitGenerateContent(prompt, {
+        responseMimeType: 'application/json'
+    });
 
     return processJsonResponse(response);
 };
@@ -83,8 +68,9 @@ export const generateVideo = async (
 ): Promise<string> => {
     const videoPrompt = getVideoPrompt(prompt, language);
     
-    // callVideoGenerationApi will now handle the status updates internally.
-    const resultUrl = await callVideoGenerationApi(videoPrompt, onRetry, onStatusUpdate);
+    onStatusUpdate('generating_video');
+    const result = await callGenkitGenerateVideo(videoPrompt);
+    onStatusUpdate('video_ready');
 
-    return resultUrl;
+    return result.videoUrl || '';
 };
