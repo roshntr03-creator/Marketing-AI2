@@ -1,16 +1,15 @@
-import { genkit } from 'genkit';
+import { configureGenkit } from '@genkit-ai/core';
+import { firebase } from '@genkit-ai/firebase';
 import { googleAI, gemini15Flash, gemini15Pro } from '@genkit-ai/googleai';
 import { onFlow } from '@genkit-ai/firebase/functions';
 
-// Configure Genkit with Google AI
-const ai = genkit({
+// Configure Genkit
+configureGenkit({
   plugins: [googleAI()],
-  model: gemini15Flash,
 });
 
 // Define flows for different AI operations
 export const generateContentFlow = onFlow(
-  ai,
   {
     name: 'generateContent',
     inputSchema: {
@@ -35,7 +34,8 @@ export const generateContentFlow = onFlow(
     
     const selectedModel = model === 'gemini-1.5-pro' ? gemini15Pro : gemini15Flash;
     
-    const response = await ai.generate({
+    const { generate } = await import('@genkit-ai/ai');
+    const response = await generate({
       model: selectedModel,
       prompt: prompt,
       config: {
@@ -53,7 +53,6 @@ export const generateContentFlow = onFlow(
 );
 
 export const generateStreamingContentFlow = onFlow(
-  ai,
   {
     name: 'generateStreamingContent',
     inputSchema: {
@@ -80,7 +79,8 @@ export const generateStreamingContentFlow = onFlow(
     
     const selectedModel = model === 'gemini-1.5-pro' ? gemini15Pro : gemini15Flash;
     
-    const response = ai.generateStream({
+    const { generateStream } = await import('@genkit-ai/ai');
+    const response = generateStream({
       model: selectedModel,
       prompt: prompt,
       config: {
@@ -97,7 +97,6 @@ export const generateStreamingContentFlow = onFlow(
 );
 
 export const generateVideoFlow = onFlow(
-  ai,
   {
     name: 'generateVideo',
     inputSchema: {
