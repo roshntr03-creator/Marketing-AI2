@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo } from 'react';
 import { type Tool } from '../types.ts';
 import { TOOLS } from '../constants.ts';

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { auth } from '../lib/firebaseClient.ts';
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
 } from 'firebase/auth';
@@ -12,36 +11,18 @@ import Logo from '../components/Logo.tsx';
 const LoginView: React.FC = () => {
   const { t } = useLocalization();
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
-      // تحسين رسائل الخطأ
-      let errorMessage = err.message;
-      if (err.code === 'auth/user-not-found') {
-        errorMessage = 'المستخدم غير موجود. يرجى التسجيل أولاً.';
-      } else if (err.code === 'auth/wrong-password') {
-        errorMessage = 'كلمة المرور غير صحيحة.';
-      } else if (err.code === 'auth/email-already-in-use') {
-        errorMessage = 'البريد الإلكتروني مستخدم بالفعل.';
-      } else if (err.code === 'auth/weak-password') {
-        errorMessage = 'كلمة المرور ضعيفة. يجب أن تكون 6 أحرف على الأقل.';
-      } else if (err.code === 'auth/invalid-email') {
-        errorMessage = 'البريد الإلكتروني غير صحيح.';
-      }
-      setError(errorMessage);
+      setError(err.message);
     }
     setLoading(false);
   };
@@ -66,13 +47,13 @@ const LoginView: React.FC = () => {
                 Marketing AI Assistant
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                {isSignUp ? 'إنشاء حساب جديد' : 'تسجيل الدخول إلى حسابك'}
+                Login to your account
             </p>
         </div>
         
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         
-        <form className="mt-8 space-y-6" onSubmit={handleAuth}>
+        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email-address" className="sr-only">{t('email_address')}</label>
@@ -110,7 +91,7 @@ const LoginView: React.FC = () => {
               disabled={loading}
               className="group relative flex w-full justify-center rounded-md border border-transparent bg-cyan-500 py-2 px-4 text-sm font-medium text-white hover:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 disabled:opacity-50"
             >
-              {loading ? '...' : (isSignUp ? t('sign_up') : t('login'))}
+              {loading ? '...' : t('login')}
             </button>
           </div>
         </form>
@@ -133,15 +114,6 @@ const LoginView: React.FC = () => {
                 <i className="fa-brands fa-google mr-2"></i>
                 {t('login_with_google')}
             </button>
-        </div>
-
-        <div className="text-center">
-          <button
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="text-cyan-500 hover:text-cyan-600 text-sm"
-          >
-            {isSignUp ? 'لديك حساب بالفعل؟ تسجيل الدخول' : t('dont_have_account') + ' ' + t('sign_up')}
-          </button>
         </div>
       </div>
     </div>

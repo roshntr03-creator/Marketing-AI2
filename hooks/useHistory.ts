@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebaseClient.ts';
 import { type Generation, type GeneratedContentData } from '../types.ts';
-import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
+// FIX: Import firebase compat to access the Timestamp type.
+import firebase from 'firebase/compat/app';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const CACHE_KEY = 'generationHistory';
@@ -32,33 +33,18 @@ export const useHistory = () => {
                 }
 
                 try {
-                    let querySnapshot;
-                    
-                    try {
-                        // Try the optimized query with index first
-                        const q = query(
-                            collection(db, 'generations'),
-                            where('userId', '==', user.uid),
-                            orderBy('createdAt', 'desc')
-                        );
-                        querySnapshot = await getDocs(q);
-                    } catch (indexError: any) {
-                        // If index is missing, fall back to simple query without ordering
-                        if (indexError.code === 'failed-precondition' && indexError.message.includes('index')) {
-                            console.warn('Firestore index missing, using fallback query');
-                            const fallbackQ = query(
-                                collection(db, 'generations'),
-                                where('userId', '==', user.uid)
-                            );
-                            querySnapshot = await getDocs(fallbackQ);
-                        } else {
-                            throw indexError;
-                        }
-                    }
-                    
+                    // FIX: Refactor query to use v8 compat API to resolve module errors.
+                    const q = db
+                        .collection('generations')
+                        .where('userId', '==', user.uid)
+                        .orderBy('createdAt', 'desc');
+
+                    // FIX: Use .get() method from v8 compat API.
+                    const querySnapshot = await q.get();
                     const firestoreHistory: Generation[] = querySnapshot.docs.map(doc => {
                         const data = doc.data();
-                        const createdAtTimestamp = data.createdAt as Timestamp;
+                        // FIX: Use compat Timestamp type.
+                        const createdAtTimestamp = data.createdAt as firebase.firestore.Timestamp;
                         
                         // Robustly sanitize the output field to create a plain, serializable object.
                         const sanitizeOutput = (output: any): GeneratedContentData | string => {
@@ -98,7 +84,7 @@ export const useHistory = () => {
                             Object.keys(inputs).forEach(key => {
                                 // Ensure value is a primitive before assigning
                                 const value = inputs[key];
-                                if (typeof value !== 'object' && value !== null && value !== undefined) {
+                                if (typeof value !== 'object' && value !== null) {
                                     clean[key] = String(value);
                                 }
                             });

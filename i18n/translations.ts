@@ -225,12 +225,6 @@ const translations = {
     'video_ready': 'الفيديو الخاص بك جاهز!',
     'video_gen_complete_toast': 'تم إنشاء الفيديو الخاص بك بنجاح!',
 
-    // Error Messages
-    'network_error': 'خطأ في الشبكة. يرجى التحقق من اتصال الإنترنت.',
-    'validation_error': 'يرجى ملء جميع الحقول المطلوبة.',
-    'file_too_large': 'حجم الملف كبير جداً.',
-    'invalid_file_type': 'نوع الملف غير مدعوم.',
-
     // Dashboard
     'welcome_back': 'أهلاً بعودتك',
     'featured_tools': 'أدوات مميزة',

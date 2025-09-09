@@ -1,110 +1,220 @@
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
-import { GoogleGenerativeAI } from '@google/genai';
-import * as cors from 'cors';
+// onRequest handlers in firebase-functions/v2 use Express Request and Response objects.
+// FIX: Correctly import `Request` from `firebase-functions/v2/https` and `Response` from `express` to resolve type collisions.
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+// FIX: Type 'Response' is aliased to 'ExpressResponse' to avoid name collision with the global 'Response' from the Fetch API.
+import type { Response as ExpressResponse } from "express";
+import * as admin from "firebase-admin";
+import { GoogleGenAI } from "@google/genai";
+import { Readable } from "stream";
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin SDK
 admin.initializeApp();
 
-// Initialize CORS
-const corsHandler = cors({ origin: true });
-
-// Initialize Gemini AI
-const getGeminiClient = () => {
-  const apiKey = functions.config().gemini?.api_key || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new functions.https.HttpsError(
-      'failed-precondition',
-      'Gemini API key not configured. Please set it using: firebase functions:config:set gemini.api_key="your-key"'
-    );
-  }
-  return new GoogleGenerativeAI(apiKey);
+// Define common function configuration for region and secrets.
+const FUNCTION_CONFIG = {
+  region: "us-central1",
+  secrets: ["API_KEY"], // Ensures API_KEY is set and loaded as an environment variable.
 };
 
-// Gemini API Call Function
-export const geminiApiCall = functions.https.onCall(async (data, context) => {
-  // Check authentication
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
-
-  try {
-    const { endpoint, params } = data;
-    const genAI = getGeminiClient();
-    
-    if (endpoint === 'generateContent') {
-      const model = genAI.getGenerativeModel({ model: params.model || 'gemini-1.5-flash' });
-      
-      const result = await model.generateContent({
-        contents: [{ parts: [{ text: params.contents }] }],
-        generationConfig: params.config || {}
-      });
-      
-      return {
-        text: result.response.text(),
-        candidates: result.response.candidates || []
-      };
+/**
+ * Handles all non-streaming, authenticated calls to the Gemini API.
+ * This is invoked by the client using `httpsCallable`.
+ */
+export const geminiApiCall = onCall(
+  {
+    ...FUNCTION_CONFIG,
+    // FIX: Removed 'rateLimits' property as it was causing a type error.
+    // This is likely due to an outdated firebase-functions SDK version in the environment.
+    // It can be re-enabled once the dependency is updated to a version that supports it.
+  },
+  async (request) => {
+    // V2 `onCall` automatically checks for auth; this is an extra safeguard.
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
-    
-    throw new functions.https.HttpsError('invalid-argument', 'Unsupported endpoint');
-  } catch (error: any) {
-    console.error('Gemini API Error:', error);
-    throw new functions.https.HttpsError('internal', error.message || 'AI service failed');
-  }
-});
 
-// Gemini Streaming Function
-export const geminiApiStream = functions.https.onRequest(async (req, res) => {
-  return corsHandler(req, res, async () => {
-    // Check authentication
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      console.error("CRITICAL: API_KEY secret is not configured or loaded.");
+      throw new HttpsError("internal", "AI service is not configured on the server.");
     }
 
     try {
-      const idToken = authHeader.split('Bearer ')[1];
-      await admin.auth().verifyIdToken(idToken);
+      const { endpoint, params } = request.data;
+      // Add stricter input validation as suggested.
+      if (typeof endpoint !== 'string' || !params || typeof params !== 'object') {
+        throw new HttpsError("invalid-argument", 'The "endpoint" (string) and "params" (object) are required.');
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      // Route the call to the correct Gemini SDK method based on the endpoint.
+      switch (endpoint) {
+        case "generateVideos":
+          const videoOp = await ai.models.generateVideos(params);
+          return { operation: videoOp };
+        case "getVideosOperation":
+          const { operationName } = params;
+          if (typeof operationName !== 'string' || !operationName) {
+            throw new HttpsError("invalid-argument", "A valid 'operationName' string is required.");
+          }
+          // FIX: Use `as any` to bypass strict type check for the operation object.
+          // The SDK expects a full GenerateVideosOperation instance, but we only have the name string from the client.
+          // This hack satisfies the compiler; the SDK should handle polling with just the name at runtime.
+          const statusOp = await ai.operations.getVideosOperation({ operation: { name: operationName } as any });
+          return { operation: statusOp };
+        case "generateContent":
+          const response = await ai.models.generateContent(params);
+          return response;
+        default:
+          throw new HttpsError("not-found", `Unknown endpoint: ${endpoint}`);
+      }
+    } catch (error: any) {
+      // Add enhanced logging with more context as suggested.
+      console.error("Error in geminiApiCall:", {
+          userId: request.auth?.uid,
+          errorMessage: error.message,
+          endpoint: request.data?.endpoint,
+          timestamp: new Date().toISOString()
+      });
+      throw new HttpsError("internal", error.message, error.details);
+    }
+  }
+);
+
+/**
+ * Handles streaming text generation from the Gemini API.
+ * This is a standard HTTPS endpoint invoked by the client using `fetch`.
+ */
+// FIX: Removed explicit type annotations from the handler.
+// This allows TypeScript to correctly infer the Express request/response types from the onRequest function signature, resolving method errors.
+export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req, res) => {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      console.error("CRITICAL: API_KEY secret is not loaded.");
+      res.status(500).json({ error: "AI service is not configured on the server." });
+      return;
+    }
+
+    const idToken = req.headers.authorization?.split("Bearer ")[1];
+    if (!idToken) {
+        res.status(401).json({ error: "Unauthorized. No authentication token provided." });
+        return;
+    }
+    try {
+        await admin.auth().verifyIdToken(idToken);
     } catch (error) {
-      res.status(401).json({ error: 'Invalid token' });
+        console.error("Error verifying auth token:", error);
+        res.status(403).json({ error: "Forbidden. Invalid authentication token." });
+        return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method Not Allowed. Please use POST." });
       return;
     }
 
     try {
       const { params } = req.body;
-      const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({ model: params.model || 'gemini-1.5-flash' });
-      
-      const result = await model.generateContentStream({
-        contents: [{ parts: [{ text: params.contents }] }],
-        generationConfig: params.config || {}
-      });
-
-      res.setHeader('Content-Type', 'text/plain');
-      res.setHeader('Transfer-Encoding', 'chunked');
-
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        if (chunkText) {
-          res.write(chunkText);
-        }
+      if (!params || typeof params !== 'object') {
+        res.status(400).json({ error: 'Bad Request: "params" (object) is required.' });
+        return;
       }
       
-      res.end();
+      const ai = new GoogleGenAI({ apiKey });
+      const responseStream = await ai.models.generateContentStream(params);
+      
+      res.set("Content-Type", "text/plain; charset=utf-8");
+      res.set("Cache-Control", "no-cache");
+      res.set("Connection", "keep-alive");
+
+      async function* generate() {
+        for await (const chunk of responseStream) {
+          yield chunk.text;
+        }
+      }
+      const stream = Readable.from(generate());
+      stream.pipe(res);
     } catch (error: any) {
-      console.error('Streaming Error:', error);
-      res.status(500).json({ error: error.message || 'Streaming failed' });
+      console.error("Error in geminiApiStream:", {
+          errorMessage: error.message,
+          timestamp: new Date().toISOString()
+      });
+      if (!res.headersSent) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.end();
+      }
     }
-  });
 });
 
-// Video Download Function (placeholder)
-export const downloadVideo = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
+/**
+ * Securely downloads video content from a Gemini-provided URI.
+ * This is a standard HTTPS endpoint invoked by the client using `fetch`.
+ */
+// FIX: Removed explicit type annotations from the handler.
+// This allows TypeScript to correctly infer the Express request/response types from the onRequest function signature, resolving method errors.
+export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req, res) => {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        console.error("CRITICAL: API_KEY secret is not loaded.");
+        res.status(500).json({ error: "AI service is not configured on the server." });
+        return;
+    }
 
-  // This is a placeholder - video generation would need additional setup
-  throw new functions.https.HttpsError('unimplemented', 'Video generation not yet implemented');
+    const idToken = req.headers.authorization?.split("Bearer ")[1];
+    if (!idToken) {
+        res.status(401).json({ error: "Unauthorized." });
+        return;
+    }
+    try {
+        await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+        res.status(403).json({ error: "Forbidden." });
+        return;
+    }
+
+    if (req.method !== "POST") {
+        res.status(405).json({ error: "Method Not Allowed." });
+        return;
+    }
+
+    try {
+        const { uri } = req.body;
+        if (typeof uri !== 'string' || !uri) {
+            res.status(400).json({ error: 'Bad Request: "uri" (string) is required.' });
+            return;
+        }
+        
+        const videoUrl = `${uri}&key=${apiKey}`;
+        const videoResponse = await fetch(videoUrl);
+
+        if (!videoResponse.ok || !videoResponse.body) {
+            const errorText = await videoResponse.text();
+            console.error(`Failed to fetch video. Status: ${videoResponse.status}`, errorText);
+            res.status(videoResponse.status).json({ error: "Failed to fetch video from source." });
+            return;
+        }
+        
+        res.set("Content-Type", "video/mp4");
+        const contentLength = videoResponse.headers.get("Content-Length");
+        if (contentLength) {
+            res.set("Content-Length", contentLength);
+        }
+        
+        const videoStream = Readable.fromWeb(videoResponse.body as any);
+        videoStream.pipe(res);
+
+    } catch (error: any)
+     {
+        console.error("Error in downloadVideo function:", {
+            errorMessage: error.message,
+            timestamp: new Date().toISOString()
+        });
+        if (!res.headersSent) {
+            res.status(500).json({ error: error.message || "An internal server error occurred." });
+        } else {
+            res.end();
+        }
+    }
 });

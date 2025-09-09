@@ -1,5 +1,3 @@
-
-
 import React, { useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization.ts';
 

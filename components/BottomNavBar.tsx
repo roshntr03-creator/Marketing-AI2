@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { useLocalization } from '../hooks/useLocalization.ts';
 import { triggerHapticFeedback } from '../lib/haptics.ts';

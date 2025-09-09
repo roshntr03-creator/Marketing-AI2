@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { type GeneratedContentData } from '../types.ts';
 import { useLocalization } from '../hooks/useLocalization.ts';

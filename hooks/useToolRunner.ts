@@ -6,7 +6,8 @@ import { triggerHapticFeedback } from '../lib/haptics.ts';
 import { useToasts } from './useToasts.ts';
 import { useAuth } from './useAuth.ts';
 import { db } from '../lib/firebaseClient.ts';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+// FIX: Import firebase compat to use FieldValue.serverTimestamp() for the v8/compat API.
+import firebase from 'firebase/compat/app';
 
 const CACHE_KEY = 'generationHistory';
 const groundedTools = ['seo_assistant', 'influencer_discovery', 'social_media_optimizer'];
@@ -41,12 +42,14 @@ export const useToolRunner = (tool: Tool) => {
     );
     
     try {
-      const docRef = await addDoc(collection(db, 'generations'), {
+      // FIX: Refactor to use v8 compat API (db.collection().add()) to resolve module errors.
+      const docRef = await db.collection('generations').add({
         userId: user.uid,
         tool_id: tool.id,
         inputs: textInputs,
         output: output,
-        createdAt: serverTimestamp(),
+        // FIX: Use compat serverTimestamp.
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
 
       // Update local cache for instant UI feedback
@@ -106,13 +109,6 @@ export const useToolRunner = (tool: Tool) => {
     e.preventDefault();
     triggerHapticFeedback();
 
-    // التحقق من صحة المدخلات
-    const requiredFields = tool.inputs.filter(input => input.type !== 'image');
-    const hasRequiredInputs = requiredFields.some(field => {
-      const value = inputs[field.name];
-      return value && typeof value === 'string' && value.trim() !== '';
-    });
-
     if (tool.id === 'short_form_factory') {
       const hasText = inputs.source_text && typeof inputs.source_text === 'string' && inputs.source_text.trim() !== '';
       const hasImage = inputs.image && inputs.image instanceof File;
@@ -120,9 +116,6 @@ export const useToolRunner = (tool: Tool) => {
         setError(t('short_form_factory_error'));
         return;
       }
-    } else if (!hasRequiredInputs) {
-      setError('يرجى ملء الحقول المطلوبة');
-      return;
     }
 
     if (videoUrl) {
