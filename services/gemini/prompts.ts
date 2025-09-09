@@ -40,3 +40,5 @@ export const getJsonPrompt = (toolId: string, inputs: Record<string, string>, la
             break;
     return `${systemInstruction}\n\nUser Request: ${userPrompt}`;
     return language === 'ar'
+    }
+}
