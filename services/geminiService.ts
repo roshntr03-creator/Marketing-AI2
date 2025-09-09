@@ -1,9 +1,11 @@
 import { GeneratedContentData, Language } from "../types.ts";
 import { 
-    callGenkitGenerateContent,
-    callGenkitGenerateStreamingContent,
-    callGenkitGenerateVideo
-} from './genkit/api.ts';
+    callGroundedGenerationApi,
+    callGroundedGenerationApiStream,
+    callJsonGenerationApi,
+    callVideoGenerationApi,
+    fileToGenerativePart
+} from './gemini/api.ts';
 import { getGroundedPrompt, getJsonPrompt, getVideoPrompt } from './gemini/prompts.ts';
 import { processGroundedResponse, processJsonResponse } from './gemini/parser.ts';
 
@@ -17,14 +19,15 @@ export const generateContentForTool = async (
     onStreamUpdate?: (chunk: string) => void
 ): Promise<GeneratedContentData> => {
     const textInputs: Record<string, string> = {};
-    const fileInputs: File[] = [];
+    let imageParts: any[] = [];
     
     for(const key in inputs) {
         const value = inputs[key];
         if(typeof value === 'string') {
             textInputs[key] = value;
         } else if (value instanceof File) {
-            fileInputs.push(value);
+            const part = await fileToGenerativePart(value);
+            imageParts.push(part);
         }
     }
     
@@ -32,9 +35,7 @@ export const generateContentForTool = async (
         const { prompt, title } = getGroundedPrompt(toolId, textInputs, language);
 
         if (onStreamUpdate) {
-            const streamGenerator = callGenkitGenerateStreamingContent(prompt, {
-                tools: [{ googleSearch: {} }]
-            });
+            const streamGenerator = callGroundedGenerationApiStream(prompt);
             let fullText = '';
             for await (const chunk of streamGenerator) {
                 onStreamUpdate(chunk);
@@ -43,19 +44,15 @@ export const generateContentForTool = async (
             const processedResult = processGroundedResponse(fullText, title);
             return processedResult;
         } else {
-            const response = await callGenkitGenerateContent(prompt, {
-                tools: [{ googleSearch: {} }]
-            });
-            const textResponse = response.text;
+            const response = await callGroundedGenerationApi(prompt, onRetry);
+            const textResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
             const generatedData = processGroundedResponse(textResponse, title);
             return generatedData;
         }
     }
 
     const prompt = getJsonPrompt(toolId, textInputs, language, imageParts.length > 0);
-    const response = await callGenkitGenerateContent(prompt, {
-        responseMimeType: 'application/json'
-    });
+    const response = await callJsonGenerationApi(prompt, imageParts, onRetry);
 
     return processJsonResponse(response);
 };
@@ -68,9 +65,6 @@ export const generateVideo = async (
 ): Promise<string> => {
     const videoPrompt = getVideoPrompt(prompt, language);
     
-    onStatusUpdate('generating_video');
-    const result = await callGenkitGenerateVideo(videoPrompt);
-    onStatusUpdate('video_ready');
 
-    return result.videoUrl || '';
+    return await callVideoGenerationApi(videoPrompt, onRetry, onStatusUpdate);
 };
