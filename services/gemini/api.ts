@@ -230,6 +230,11 @@ export const callVideoGenerationApi = async (prompt: string, onRetry: (delaySeco
     const startGenerationCall = () => callProxyApi('generateVideos', startParams);
     let { operation } = await withRetry(startGenerationCall, onRetry);
 
+    // Validate that operation has a valid name property
+    if (!operation || !operation.name || typeof operation.name !== 'string') {
+        throw new Error('Video generation failed: Invalid operation returned from server');
+    }
+
     onStatusUpdate('processing_video');
     const MAX_POLLING_ATTEMPTS = 10;
     let pollingFailures = 0;
