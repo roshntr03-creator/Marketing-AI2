@@ -133,7 +133,7 @@ export const callGroundedGenerationApi = async (prompt: string, onRetry: (delayS
     const params = {
         model: 'gemini-2.5-flash',
         contents: prompt,
-        config: { tools: [{ google_search_retrieval: {} }] },
+        config: { tools: [{ googleSearchRetrieval: {} }] },
     };
     const apiCall = () => callProxyApi('generateContent', params);
     return withRetry(apiCall, onRetry) as Promise<GenerateContentResponse>;
@@ -153,7 +153,7 @@ export async function* callGroundedGenerationApiStream(prompt: string): AsyncGen
             params: {
                 model: 'gemini-1.5-flash',
                 contents: prompt,
-                config: { tools: [{ google_search_retrieval: {} }] }
+                config: { tools: [{ googleSearchRetrieval: {} }] }
             }
         }),
     });
