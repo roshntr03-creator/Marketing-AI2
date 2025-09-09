@@ -1,8 +1,6 @@
 // onRequest handlers in firebase-functions/v2 use Express Request and Response objects.
-// FIX: Import Request and Response from firebase-functions/v2/https to avoid conflicts with global types.
-import { onCall, onRequest, HttpsError, Request as FunctionsRequest } from "firebase-functions/v2/https";
-// FIX: Using a namespace import for express to create an unambiguous type for the Response object, resolving type collisions.
-import * as express from "express";
+// FIX: Import Request and Response directly from 'firebase-functions/v2/https' to resolve type collisions.
+import { onCall, onRequest, HttpsError, Request, Response } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { GoogleGenAI } from "@google/genai";
 import { Readable } from "stream";
@@ -58,7 +56,7 @@ export const geminiApiCall = onCall(
           if (!opParam || typeof opParam.name !== 'string') {
             throw new HttpsError("invalid-argument", "A valid operation object with a 'name' property is required.");
           }
-          const statusOp = await ai.operations.getVideosOperation({ operation: opParam.name });
+          const statusOp = await ai.operations.get({ operation: opParam.name });
           return { operation: statusOp };
         case "generateContent":
           const response = await ai.models.generateContent(params);
@@ -83,8 +81,8 @@ export const geminiApiCall = onCall(
  * Handles streaming text generation from the Gemini API.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Explicitly type 'res' as 'express.Response' to resolve method errors caused by type collision.
-export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: FunctionsRequest, res: express.Response) => {
+// FIX: Explicitly type 'req' and 'res' with types from 'firebase-functions/v2/https' to resolve method errors.
+export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: Response) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
       console.error("CRITICAL: API_KEY secret is not loaded.");
@@ -148,8 +146,8 @@ export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, asy
  * Securely downloads video content from a Gemini-provided URI.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Explicitly type 'res' as 'express.Response' to resolve method errors caused by type collision.
-export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: FunctionsRequest, res: express.Response) => {
+// FIX: Explicitly type 'req' and 'res' with types from 'firebase-functions/v2/https' to resolve method errors.
+export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: Response) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
         console.error("CRITICAL: API_KEY secret is not loaded.");
