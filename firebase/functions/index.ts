@@ -54,8 +54,8 @@ export const geminiApiCall = onCall(
           return { operation: videoOp };
         case "getVideosOperation":
           const { operation: opParam } = params;
-          if (!opParam || typeof opParam.name !== 'string' || opParam.name.trim() === '') {
-            throw new HttpsError("invalid-argument", "A valid operation object with a 'name' property is required.");
+          if (!opParam || !opParam.name || typeof opParam.name !== 'string' || opParam.name.trim() === '') {
+            throw new HttpsError("invalid-argument", "Operation name is required and must be a non-empty string.");
           }
           const statusOp = await ai.operations.get({ operation: opParam.name });
           return { operation: statusOp };
