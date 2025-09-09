@@ -14,28 +14,28 @@ export const getGroundedPrompt = (toolId: string, inputs: Record<string, string>
             break;
         case 'influencer_discovery':
             prompt = isArabic
-                ? `بناءً على أحدث نتائج بحث الويب، ابحث عن أفضل 5 مؤثرين محليين في ${inputs.city} في مجال ${inputs.field}. لكل مؤثر، قدم المعلومات التالية بتنسيق واضح:
+                ? `ابحث في الويب عن أفضل 5 مؤثرين نشطين في ${inputs.city} متخصصين في مجال ${inputs.field}. يجب أن تقدم لكل مؤثر المعلومات التالية بالضبط:
 
 **الاسم/المعرف:** اسم المؤثر ومعرفه على المنصة
 **المنصة الرئيسية:** (انستغرام، تيك توك، يوتيوب، إلخ)
 **عدد المتابعين:** العدد التقريبي للمتابعين
-**رابط الصفحة:** الرابط المباشر لصفحة المؤثر
+**رابط الصفحة:** الرابط المباشر لصفحة المؤثر (مثل: instagram.com/username)
 **وصف المحتوى:** وصف موجز لنوع المحتوى الذي ينشره
 **سبب الاختيار:** لماذا هو مناسب لمجال ${inputs.field}
 **معدل التفاعل:** تقدير لمعدل التفاعل مع منشوراته
 
-قدم النتيجة بتنسيق ماركداون منظم وسهل القراءة.`
-                : `Based on the latest web search results, find the top 5 local influencers in ${inputs.city} for the ${inputs.field} niche. For each influencer, provide the following information in a clear format:
+ابحث عن مؤثرين حقيقيين موجودين فعلاً ولديهم حسابات نشطة. لا تقل أنك لا تستطيع العثور على المعلومات - ابحث واعطني أسماء وتفاصيل محددة.`
+                : `Search the web for the top 5 active influencers in ${inputs.city} specializing in ${inputs.field}. You must provide the following information for each influencer exactly:
 
 **Name/Handle:** The influencer's name and platform handle
 **Main Platform:** (Instagram, TikTok, YouTube, etc.)
 **Follower Count:** Approximate number of followers
-**Profile Link:** Direct link to the influencer's profile
+**Profile Link:** Direct link to the influencer's profile (e.g., instagram.com/username)
 **Content Description:** Brief description of the type of content they create
 **Why They're a Good Fit:** Explanation of why they suit the ${inputs.field} niche
 **Engagement Rate:** Estimated engagement rate on their posts
 
-Present the result in a well-organized, easy-to-read markdown format.`;
+Find real influencers who actually exist and have active accounts. Don't say you can't find the information - search and give me specific names and details.`;
             title = isArabic ? `مؤثرون في ${inputs.city} لمجال ${inputs.field}` : `Influencers in ${inputs.city} for ${inputs.field}`;
             break;
         case 'social_media_optimizer':
