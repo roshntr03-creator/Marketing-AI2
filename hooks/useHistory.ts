@@ -81,7 +81,7 @@ export const useHistory = () => {
                             Object.keys(inputs).forEach(key => {
                                 // Ensure value is a primitive before assigning
                                 const value = inputs[key];
-                                if (typeof value !== 'object' && value !== null) {
+                                if (typeof value !== 'object' && value !== null && value !== undefined) {
                                     clean[key] = String(value);
                                 }
                             });

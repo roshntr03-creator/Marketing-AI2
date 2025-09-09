@@ -25,7 +25,11 @@ const App: React.FC = () => {
     if (storedTheme === 'light' || storedTheme === 'dark') {
       return storedTheme;
     }
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    // التحقق من وجود matchMedia قبل الاستخدام
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
   });
 
   const [language, setLanguageState] = useState<Language>(() => {

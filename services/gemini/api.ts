@@ -41,6 +41,12 @@ const getAuthToken = async (): Promise<string> => {
 const callProxyApi = async (endpoint: string, params: any): Promise<any> => {
     try {
         const token = await getAuthToken();
+        
+        // التحقق من صحة المعاملات
+        if (!endpoint || typeof endpoint !== 'string') {
+            throw new Error('Invalid endpoint provided');
+        }
+        
         const response = await fetch(GEMINI_API_CALL_URL, {
             method: 'POST',
             headers: {
@@ -50,6 +56,10 @@ const callProxyApi = async (endpoint: string, params: any): Promise<any> => {
             // Callable functions expect the payload to be wrapped in a 'data' object.
             body: JSON.stringify({ data: { endpoint, params } }),
         });
+        
+        if (!response) {
+            throw new Error('No response received from server');
+        }
         
         const result = await response.json();
         
@@ -67,6 +77,15 @@ const callProxyApi = async (endpoint: string, params: any): Promise<any> => {
         return result.result;
     } catch (error: any) {
         console.error("Firebase Functions call failed:", error);
+        
+        // تحسين معالجة الأخطاء
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            const networkError = new Error('فشل في الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
+            // @ts-ignore
+            networkError.context = { error: 'Network connection failed', hint: 'Check internet connection' };
+            throw networkError;
+        }
+        
         // Ensure error is in a consistent format for the caller.
         const enhancedError = new Error(error.message || 'The AI service failed to respond.');
         // @ts-ignore

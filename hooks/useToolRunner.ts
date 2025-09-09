@@ -106,6 +106,13 @@ export const useToolRunner = (tool: Tool) => {
     e.preventDefault();
     triggerHapticFeedback();
 
+    // التحقق من صحة المدخلات
+    const requiredFields = tool.inputs.filter(input => input.type !== 'image');
+    const hasRequiredInputs = requiredFields.some(field => {
+      const value = inputs[field.name];
+      return value && typeof value === 'string' && value.trim() !== '';
+    });
+
     if (tool.id === 'short_form_factory') {
       const hasText = inputs.source_text && typeof inputs.source_text === 'string' && inputs.source_text.trim() !== '';
       const hasImage = inputs.image && inputs.image instanceof File;
@@ -113,6 +120,9 @@ export const useToolRunner = (tool: Tool) => {
         setError(t('short_form_factory_error'));
         return;
       }
+    } else if (!hasRequiredInputs) {
+      setError('يرجى ملء الحقول المطلوبة');
+      return;
     }
 
     if (videoUrl) {

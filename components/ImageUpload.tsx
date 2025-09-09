@@ -12,7 +12,20 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ previewSrc, onFileSelect, onC
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (file: File | null) => {
-    if (file && file.type.startsWith('image/')) {
+    if (file) {
+      // التحقق من نوع الملف
+      if (!file.type.startsWith('image/')) {
+        alert('يرجى اختيار ملف صورة صحيح');
+        return;
+      }
+      
+      // التحقق من حجم الملف (5MB كحد أقصى)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        alert('حجم الملف كبير جداً. يرجى اختيار صورة أصغر من 5MB');
+        return;
+      }
+      
       onFileSelect(file);
     }
   };
