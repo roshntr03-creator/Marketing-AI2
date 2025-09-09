@@ -1,10 +1,9 @@
 
 
-// FIX: Import `Request` and `Response` types from `express` to ensure
-// proper type checking for onRequest handlers. The default types from
-// `firebase-functions` are not fully compatible with the Express methods used.
+// onRequest handlers in firebase-functions/v2 use Express Request and Response objects.
+// We import the express namespace to avoid type conflicts with other global types.
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
-import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
+import * as express from "express";
 import * as admin from "firebase-admin";
 import { GoogleGenAI } from "@google/genai";
 import { Readable } from "stream";
@@ -67,8 +66,8 @@ export const geminiApiCall = onCall(FUNCTION_CONFIG, async (request) => {
  * Handles streaming text generation from the Gemini API.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Use aliased Express types for the request and response handler arguments to resolve type conflicts.
-export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: ExpressRequest, res: ExpressResponse) => {
+// FIX: Use explicit express types for the request and response handler arguments to resolve type conflicts.
+export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: express.Request, res: express.Response) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
       console.error("CRITICAL: API_KEY secret is not loaded.");
@@ -130,8 +129,8 @@ export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, asy
  * Securely downloads video content from a Gemini-provided URI.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Use aliased Express types for the request and response handler arguments to resolve type conflicts.
-export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: ExpressRequest, res: ExpressResponse) => {
+// FIX: Use explicit express types for the request and response handler arguments to resolve type conflicts.
+export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: express.Request, res: express.Response) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
         console.error("CRITICAL: API_KEY secret is not loaded.");
