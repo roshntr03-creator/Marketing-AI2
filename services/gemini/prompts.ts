@@ -14,8 +14,8 @@ export const getGroundedPrompt = (toolId: string, inputs: Record<string, string>
             break;
         case 'influencer_discovery':
             prompt = isArabic
-                ? `بناءً على أحدث نتائج بحث الويب، ابحث عن أفضل 5 مؤثرين محليين في ${inputs.city} في مجال ${inputs.field}. لكل مؤثر، قدم اسمه/معرفه، ووصفًا موجزًا لمحتواه، ولماذا هو مناسب. قدم النتيجة بتنسيق ماركداون واضح وسهل القراءة.`
-                : `Based on the latest web search results, find the top 5 local influencers in ${inputs.city} for the ${inputs.field} niche. For each influencer, provide their name/handle, a brief description of their content, and why they are a good fit. Present the result in a clear, easy-to-read markdown format.`;
+                ? `باستخدام بحث جوجل، قم بإعداد قائمة بـ 5 مؤثرين مشهورين في مدينة ${inputs.city} متخصصين في مجال ${inputs.field}. لكل مؤثر، اذكر اسمه أو حسابه على وسائل التواصل الاجتماعي، وقدم وصفًا موجزًا لمحتواه، وسببًا لاقتراحه. إذا لم تتمكن من العثور على 5، فاذكر العدد الذي وجدته. قدم الإجابة بتنسيق ماركداون منظم.`
+                : `Using Google Search, create a list of 5 popular influencers in ${inputs.city} specializing in the ${inputs.field} niche. For each influencer, state their name or social media handle, provide a brief description of their content, and a reason for the suggestion. If you cannot find 5, list as many as you can find. Provide the answer in a structured markdown format.`;
             title = isArabic ? `مؤثرون في ${inputs.city} لمجال ${inputs.field}` : `Influencers in ${inputs.city} for ${inputs.field}`;
             break;
         case 'social_media_optimizer':

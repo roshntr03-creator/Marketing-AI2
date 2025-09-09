@@ -1,6 +1,6 @@
 // onRequest handlers in firebase-functions/v2 use Express Request and Response objects.
 // FIX: Correctly import `Request` from `firebase-functions/v2/https` and `Response` from `express` to resolve type collisions.
-import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError, Request } from "firebase-functions/v2/https";
 // FIX: Type 'Response' is aliased to 'ExpressResponse' to avoid name collision with the global 'Response' from the Fetch API.
 import type { Response as ExpressResponse } from "express";
 import * as admin from "firebase-admin";
@@ -86,9 +86,8 @@ export const geminiApiCall = onCall(
  * Handles streaming text generation from the Gemini API.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Removed explicit type annotations from the handler.
-// This allows TypeScript to correctly infer the Express request/response types from the onRequest function signature, resolving method errors.
-export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req, res) => {
+// FIX: Explicitly type request and response to ensure correct type inference, resolving method errors.
+export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: ExpressResponse) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
       console.error("CRITICAL: API_KEY secret is not loaded.");
@@ -152,9 +151,8 @@ export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, asy
  * Securely downloads video content from a Gemini-provided URI.
  * This is a standard HTTPS endpoint invoked by the client using `fetch`.
  */
-// FIX: Removed explicit type annotations from the handler.
-// This allows TypeScript to correctly infer the Express request/response types from the onRequest function signature, resolving method errors.
-export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req, res) => {
+// FIX: Explicitly type request and response to ensure correct type inference, resolving method errors.
+export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: ExpressResponse) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
         console.error("CRITICAL: API_KEY secret is not loaded.");
