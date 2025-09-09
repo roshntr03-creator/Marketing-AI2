@@ -1,0 +1,19 @@
+/* Base styles for Marketing AI App */
+
+/* CSS Reset and Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+/* 
+  Note: The primary font stack and body background/text colors are managed 
+  by the Tailwind CSS configuration script and utility classes in index.html.
+  This file primarily serves as a CSS reset and a placeholder for any future
+  global non-Tailwind styles.
+*/

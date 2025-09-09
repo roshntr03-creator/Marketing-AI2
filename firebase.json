@@ -9,7 +9,8 @@
       ".firebaserc",
       "firebase/**",
       "*.md",
-      "*.log"
+      "*.log",
+      "node_modules/**"
     ],
     "headers": [
       {
