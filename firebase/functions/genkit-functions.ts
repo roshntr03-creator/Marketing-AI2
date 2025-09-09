@@ -80,7 +80,7 @@ export const generateStreamingContentFlow = onFlow(
     const selectedModel = model === 'gemini-1.5-pro' ? gemini15Pro : gemini15Flash;
     
     const { generateStream } = await import('@genkit-ai/ai');
-    const response = generateStream({
+    const response = await generateStream({
       model: selectedModel,
       prompt: prompt,
       config: {
