@@ -8,7 +8,7 @@ export const firebaseConfig: FirebaseOptions = {
   apiKey: "AIzaSyBEyzPSErOgNiKUp8psz_stgooB4Bpzl2I",
   authDomain: "marketing-ai3-6f723.firebaseapp.com",
   projectId: "marketing-ai3-6f723",
-  storageBucket: "marketing-ai3-6f723.appspot.com",
+  storageBucket: "marketing-ai3-6f723.firebasestorage.app",
   messagingSenderId: "1003541680857",
   appId: "1:1003541680857:web:6a7b3565b6918de8cb24c8",
   measurementId: "G-436HC96G3L"

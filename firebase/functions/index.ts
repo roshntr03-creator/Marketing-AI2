@@ -1,6 +1,7 @@
 // onRequest handlers in firebase-functions/v2 use Express Request and Response objects.
-// FIX: Import Request and Response directly from 'firebase-functions/v2/https' to resolve type collisions.
-import { onCall, onRequest, HttpsError, Request, Response } from "firebase-functions/v2/https";
+// FIX: Correctly import `Request` from `firebase-functions/v2/https` and `Response` from `express` to resolve type collisions.
+import { onCall, onRequest, HttpsError, Request } from "firebase-functions/v2/https";
+import type { Response } from "express";
 import * as admin from "firebase-admin";
 import { GoogleGenAI } from "@google/genai";
 import { Readable } from "stream";
