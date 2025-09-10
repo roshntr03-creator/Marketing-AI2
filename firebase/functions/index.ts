@@ -1,218 +1,188 @@
-// onRequest handlers in firebase-functions/v2 use Express Request and Response objects.
-// FIX: Correctly import `Request` from `firebase-functions/v2/https` and `Response` from `express` to resolve type collisions.
-import { onCall, onRequest, HttpsError, Request } from "firebase-functions/v2/https";
-// FIX: Type 'Response' is aliased to 'ExpressResponse' to avoid name collision with the global 'Response' from the Fetch API.
-import type { Response as ExpressResponse } from "express";
+// FIX: Use firebase-functions/v1 to align with v1 syntax like .region() and https.onCall.
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
-import { GoogleGenAI } from "@google/genai";
-import { Readable } from "stream";
+import * as cors from "cors";
+// FIX: Import Request and Response from express to correctly type the onRequest handler and avoid global type conflicts.
+// By aliasing them, we ensure there's no confusion with global Request/Response types from other libraries like DOM.
+import { Request as ExpressRequest, Response as ExpressResponse } from "express";
 
-// Initialize Firebase Admin SDK
+// Assuming a monorepo setup where we can import from the root src folder.
+// The build process must handle this.
+// FIX: Import GenerateVideosOperation for video generation return types and remove unused Operation type.
+import { GoogleGenAI, GenerateContentResponse, Type, GenerateContentParameters, GenerateVideosOperation } from '@google/genai';
+import { TOOLS } from "../../constants";
+import { getPrompt, getSystemInstruction } from "../../services/gemini/prompts";
+import { Tool } from "../../types";
+
 admin.initializeApp();
 
-// Define common function configuration for region and secrets.
-const FUNCTION_CONFIG = {
-  region: "us-central1",
-  secrets: ["API_KEY"], // Ensures API_KEY is set and loaded as an environment variable.
+const regionalFunctions = functions.region("us-central1");
+const corsHandler = cors({origin: true});
+
+if (!process.env.API_KEY) {
+    try {
+        process.env.API_KEY = functions.config().gemini.key;
+    } catch(e) {
+        console.error("Failed to get gemini.key from firebase config");
+    }
+}
+if (!process.env.API_KEY) {
+    console.error("Gemini API Key is not set in environment variables or Firebase config.");
+    // Throwing an error at initialization is better than at runtime.
+    throw new Error("API_KEY not configured.");
+}
+
+// FIX: Initialize GoogleGenAI with named apiKey parameter.
+const genAI = new GoogleGenAI({apiKey: process.env.API_KEY!});
+
+interface ImageInput {
+  base64: string;
+  mimeType: string;
+}
+
+// Re-implementing API calls here to keep backend self-contained and secure.
+const callGeminiBackend = async (
+  tool: Tool,
+  inputs: Record<string, string | ImageInput>
+): Promise<GenerateContentResponse> => {
+    const modelName = 'gemini-2.5-flash';
+    const contentRequest = getPrompt(tool.id, inputs) as GenerateContentParameters['contents'];
+    const systemInstruction = getSystemInstruction(tool.id);
+
+    const response = await genAI.models.generateContent({
+        model: modelName,
+        contents: contentRequest,
+        config: {
+            systemInstruction: systemInstruction,
+        }
+    });
+    return response;
 };
 
-/**
- * Handles all non-streaming, authenticated calls to the Gemini API.
- * This is invoked by the client using `httpsCallable`.
- */
-export const geminiApiCall = onCall(
-  {
-    ...FUNCTION_CONFIG,
-    // FIX: Removed 'rateLimits' property as it was causing a type error.
-    // This is likely due to an outdated firebase-functions SDK version in the environment.
-    // It can be re-enabled once the dependency is updated to a version that supports it.
-  },
-  async (request) => {
-    // V2 `onCall` automatically checks for auth; this is an extra safeguard.
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
+const callGeminiWithGroundingBackend = async(prompt: string): Promise<GenerateContentResponse> => {
+    const modelName = 'gemini-2.5-flash';
+    const response = await genAI.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] },
+    });
+    return response;
+};
+
+// FIX: Specify the correct return type GenerateVideosOperation instead of the generic Operation.
+const callVideoGeneratorBackend = async (prompt: string): Promise<GenerateVideosOperation> => {
+    const operation = await genAI.models.generateVideos({
+        model: 'veo-2.0-generate-001',
+        prompt: prompt,
+        config: { numberOfVideos: 1 }
+    });
+    return operation;
+};
+
+// FIX: Specify the correct return type GenerateVideosOperation instead of the generic Operation.
+const checkVideoOperationBackend = async (operationName: string): Promise<GenerateVideosOperation> => {
+    // FIX: The getVideosOperation method's type signature requires a full GenerateVideosOperation object,
+    // but it only uses the 'name' property. Cast a minimal object to satisfy TypeScript.
+    const operation = await genAI.operations.getVideosOperation({ operation: { name: operationName } as GenerateVideosOperation });
+    return operation;
+}
+
+export const generateContent = regionalFunctions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
-
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.error("CRITICAL: API_KEY secret is not configured or loaded.");
-      throw new HttpsError("internal", "AI service is not configured on the server.");
+    const { toolId, inputs } = data;
+    if (!toolId || !inputs) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing 'toolId' or 'inputs'.");
     }
-
-    try {
-      const { endpoint, params } = request.data;
-      // Add stricter input validation as suggested.
-      if (typeof endpoint !== 'string' || !params || typeof params !== 'object') {
-        throw new HttpsError("invalid-argument", 'The "endpoint" (string) and "params" (object) are required.');
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-
-      // Route the call to the correct Gemini SDK method based on the endpoint.
-      switch (endpoint) {
-        case "generateVideos":
-          const videoOp = await ai.models.generateVideos(params);
-          return { operation: videoOp };
-        case "getVideosOperation":
-          const { operationName } = params;
-          if (typeof operationName !== 'string' || !operationName) {
-            throw new HttpsError("invalid-argument", "A valid 'operationName' string is required.");
-          }
-          // FIX: Use `as any` to bypass strict type check for the operation object.
-          // The SDK expects a full GenerateVideosOperation instance, but we only have the name string from the client.
-          // This hack satisfies the compiler; the SDK should handle polling with just the name at runtime.
-          const statusOp = await ai.operations.getVideosOperation({ operation: { name: operationName } as any });
-          return { operation: statusOp };
-        case "generateContent":
-          const response = await ai.models.generateContent(params);
-          return response;
-        default:
-          throw new HttpsError("not-found", `Unknown endpoint: ${endpoint}`);
-      }
-    } catch (error: any) {
-      // Add enhanced logging with more context as suggested.
-      console.error("Error in geminiApiCall:", {
-          userId: request.auth?.uid,
-          errorMessage: error.message,
-          endpoint: request.data?.endpoint,
-          timestamp: new Date().toISOString()
-      });
-      throw new HttpsError("internal", error.message, error.details);
-    }
-  }
-);
-
-/**
- * Handles streaming text generation from the Gemini API.
- * This is a standard HTTPS endpoint invoked by the client using `fetch`.
- */
-// FIX: Explicitly type request and response to ensure correct type inference, resolving method errors.
-export const geminiApiStream = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: ExpressResponse) => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.error("CRITICAL: API_KEY secret is not loaded.");
-      res.status(500).json({ error: "AI service is not configured on the server." });
-      return;
-    }
-
-    const idToken = req.headers.authorization?.split("Bearer ")[1];
-    if (!idToken) {
-        res.status(401).json({ error: "Unauthorized. No authentication token provided." });
-        return;
-    }
-    try {
-        await admin.auth().verifyIdToken(idToken);
-    } catch (error) {
-        console.error("Error verifying auth token:", error);
-        res.status(403).json({ error: "Forbidden. Invalid authentication token." });
-        return;
-    }
-
-    if (req.method !== "POST") {
-      res.status(405).json({ error: "Method Not Allowed. Please use POST." });
-      return;
+    const tool = TOOLS.find(t => t.id === toolId);
+    if (!tool) {
+        throw new functions.https.HttpsError("not-found", `Tool with id ${toolId} not found.`);
     }
 
     try {
-      const { params } = req.body;
-      if (!params || typeof params !== 'object') {
-        res.status(400).json({ error: 'Bad Request: "params" (object) is required.' });
-        return;
-      }
-      
-      const ai = new GoogleGenAI({ apiKey });
-      const responseStream = await ai.models.generateContentStream(params);
-      
-      res.set("Content-Type", "text/plain; charset=utf-8");
-      res.set("Cache-Control", "no-cache");
-      res.set("Connection", "keep-alive");
-
-      async function* generate() {
-        for await (const chunk of responseStream) {
-          yield chunk.text;
-        }
-      }
-      const stream = Readable.from(generate());
-      stream.pipe(res);
-    } catch (error: any) {
-      console.error("Error in geminiApiStream:", {
-          errorMessage: error.message,
-          timestamp: new Date().toISOString()
-      });
-      if (!res.headersSent) {
-        res.status(500).json({ error: error.message });
-      } else {
-        res.end();
-      }
-    }
-});
-
-/**
- * Securely downloads video content from a Gemini-provided URI.
- * This is a standard HTTPS endpoint invoked by the client using `fetch`.
- */
-// FIX: Explicitly type request and response to ensure correct type inference, resolving method errors.
-export const downloadVideo = onRequest({ ...FUNCTION_CONFIG, cors: true }, async (req: Request, res: ExpressResponse) => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        console.error("CRITICAL: API_KEY secret is not loaded.");
-        res.status(500).json({ error: "AI service is not configured on the server." });
-        return;
-    }
-
-    const idToken = req.headers.authorization?.split("Bearer ")[1];
-    if (!idToken) {
-        res.status(401).json({ error: "Unauthorized." });
-        return;
-    }
-    try {
-        await admin.auth().verifyIdToken(idToken);
-    } catch (error) {
-        res.status(403).json({ error: "Forbidden." });
-        return;
-    }
-
-    if (req.method !== "POST") {
-        res.status(405).json({ error: "Method Not Allowed." });
-        return;
-    }
-
-    try {
-        const { uri } = req.body;
-        if (typeof uri !== 'string' || !uri) {
-            res.status(400).json({ error: 'Bad Request: "uri" (string) is required.' });
-            return;
-        }
-        
-        const videoUrl = `${uri}&key=${apiKey}`;
-        const videoResponse = await fetch(videoUrl);
-
-        if (!videoResponse.ok || !videoResponse.body) {
-            const errorText = await videoResponse.text();
-            console.error(`Failed to fetch video. Status: ${videoResponse.status}`, errorText);
-            res.status(videoResponse.status).json({ error: "Failed to fetch video from source." });
-            return;
-        }
-        
-        res.set("Content-Type", "video/mp4");
-        const contentLength = videoResponse.headers.get("Content-Length");
-        if (contentLength) {
-            res.set("Content-Length", contentLength);
-        }
-        
-        const videoStream = Readable.fromWeb(videoResponse.body as any);
-        videoStream.pipe(res);
-
-    } catch (error: any)
-     {
-        console.error("Error in downloadVideo function:", {
-            errorMessage: error.message,
-            timestamp: new Date().toISOString()
-        });
-        if (!res.headersSent) {
-            res.status(500).json({ error: error.message || "An internal server error occurred." });
+        // Special handling for tools
+        if (tool.id === 'seo_assistant') {
+            const prompt = getPrompt(tool.id, inputs) as string;
+            const response = await callGeminiWithGroundingBackend(prompt);
+            const text = response.text;
+            const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => chunk.web).filter(Boolean) || [];
+            return { text, sources };
         } else {
-            res.end();
+            const response = await callGeminiBackend(tool, inputs as Record<string, string | ImageInput>);
+            const text = response.text;
+            return { text };
         }
+    } catch (error: any) {
+        console.error("Error calling Gemini API:", JSON.stringify(error));
+        throw new functions.https.HttpsError("internal", "An error occurred with the AI model.", error.message);
     }
 });
+
+
+export const generateVideo = regionalFunctions
+    .runWith({ timeoutSeconds: 540, memory: "1GB" })
+    // FIX: Explicitly type request and response using aliases to avoid type conflicts with global fetch/DOM types,
+    // which may be incorrectly included in the build environment. This ensures compatibility with cors middleware.
+    .https.onRequest((req: ExpressRequest, res: ExpressResponse) => {
+        corsHandler(req, res, async () => {
+            if (req.method !== 'POST') {
+                res.status(405).send('Method Not Allowed');
+                return;
+            }
+
+            const idToken = req.headers.authorization?.split('Bearer ')[1];
+            if (!idToken) {
+                res.status(401).send('Unauthorized: No token provided.');
+                return;
+            }
+
+            try {
+                await admin.auth().verifyIdToken(idToken);
+            } catch (error) {
+                res.status(401).send('Unauthorized: Invalid token.');
+                return;
+            }
+
+            const { prompt } = req.body;
+            if (!prompt || typeof prompt !== 'string') {
+                res.status(400).send('Bad Request: Missing or invalid prompt.');
+                return;
+            }
+
+            try {
+                let operation = await callVideoGeneratorBackend(prompt);
+
+                while (!operation.done) {
+                    await new Promise(resolve => setTimeout(resolve, 10000)); // wait 10s
+                    operation = await checkVideoOperationBackend(operation.name);
+                }
+
+                if (operation.error) {
+                    // FIX: Safely access the error message property and provide a fallback.
+                    throw new Error(String(operation.error.message || 'Video generation failed with an unknown error.'));
+                }
+                
+                const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+                if (!videoUri) {
+                    throw new Error("Video generation completed but no URI was found.");
+                }
+                
+                const downloadableUrl = `${videoUri}&key=${process.env.API_KEY}`;
+                
+                // Fetch the video on the server to avoid exposing the key
+                const videoResponse = await fetch(downloadableUrl);
+
+                if (!videoResponse.ok) {
+                    throw new Error(`Failed to fetch video file: ${videoResponse.statusText}`);
+                }
+                
+                res.setHeader('Content-Type', 'video/mp4');
+                (videoResponse.body as any).pipe(res);
+
+            } catch (error: any) {
+                console.error("Error during video generation:", error);
+                res.status(500).send(`Internal Server Error: ${error.message}`);
+            }
+        });
+    });

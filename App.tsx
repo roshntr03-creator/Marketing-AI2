@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { type Theme, type Language } from './types.ts';
 import { LanguageContext } from './hooks/useLocalization.ts';
@@ -12,7 +14,6 @@ import BottomNavBar from './components/BottomNavBar.tsx';
 import LoadingSpinner from './components/LoadingSpinner.tsx';
 import { useAuth } from './hooks/useAuth.ts';
 import { auth } from './lib/firebaseClient.ts';
-import { signOut } from 'firebase/auth';
 import { ToastProvider } from './components/ToastProvider.tsx';
 
 type View = 'dashboard' | 'tools' | 'analytics' | 'settings';
@@ -58,19 +59,29 @@ const App: React.FC = () => {
     setLanguageState(newLang);
   };
 
-  const t = useMemo(() => (key: string): string => {
+  // FIX: Updated the `t` function to handle placeholder replacements.
+  const t = useMemo(() => (key: string, replacements?: Record<string, string | number>): string => {
     const langKey = language as keyof typeof translations;
+    let translation = key;
+
     if (translations[langKey] && (translations[langKey] as any)[key]) {
-      return (translations[langKey] as any)[key];
+      translation = (translations[langKey] as any)[key];
     }
-    return key;
+    
+    if (replacements) {
+      Object.keys(replacements).forEach(rKey => {
+        translation = translation.replace(`{${rKey}}`, String(replacements[rKey]));
+      });
+    }
+
+    return translation;
   }, [language]);
 
   const languageContextValue = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
   const themeContextValue = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
   
   const handleLogout = async () => {
-    await signOut(auth);
+    await auth.signOut();
   };
 
   if (authLoading) {

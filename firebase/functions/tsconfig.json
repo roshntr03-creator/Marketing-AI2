@@ -8,10 +8,15 @@
     "strict": false,
     "target": "es2021",
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "rootDir": "../.."
   },
   "compileOnSave": true,
   "include": [
-    "index.ts"
+    "index.ts",
+    "../../constants.ts",
+    "../../types.ts",
+    "../../services/gemini/prompts.ts",
+    "../../services/gemini/api.ts"
   ]
 }

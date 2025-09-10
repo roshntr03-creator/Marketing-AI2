@@ -1,90 +1,67 @@
-import { Language } from "../../types.ts";
+import { GenerateContentParameters } from '@google/genai';
+import { ImageInput } from './api.ts';
 
-export const getGroundedPrompt = (toolId: string, inputs: Record<string, string>, language: Language): { prompt: string, title: string } => {
-    let prompt = '';
-    let title = '';
-    const isArabic = language === 'ar';
+const JSON_FORMAT_INSTRUCTION = `
+IMPORTANT: Your entire response must be a single, valid JSON object. Do not include any text, markdown, or code block syntax before or after the JSON. The JSON object must have a "title" property (a string) and a "sections" property (an array of objects). Each object in the "sections" array must have a "heading" property (a string) and a "content" property (a string, which can contain markdown or newlines).`;
 
-    switch (toolId) {
-        case 'seo_assistant':
-            prompt = isArabic 
-                ? `بناءً على أحدث نتائج بحث الويب لموضوع "${inputs.topic}"، قم بإنشاء ملخص محتوى شامل لتحسين محركات البحث. قدم تحليلاً مفصلاً يتضمن عنوانًا جذابًا، ووصفًا ميتا أقل من 160 حرفًا، وقائمة بما لا يقل عن 10 كلمات رئيسية ذات صلة، وهيكل محتوى مقترح مع عناوين H2 و H3. قم بتنظيم الاستجابة بعناوين ماركداون واضحة.`
-                : `Based on the latest web search results for the topic "${inputs.topic}", generate a comprehensive SEO content brief. Provide a detailed analysis including a compelling title, a meta description under 160 characters, a list of at least 10 relevant keywords, and a suggested content structure with H2 and H3 headings. Structure the response with clear markdown headings.`;
-            title = isArabic ? `ملخص SEO: ${inputs.topic}` : `SEO Brief: ${inputs.topic}`;
-            break;
-        case 'influencer_discovery':
-            prompt = isArabic
-                ? `باستخدام بحث جوجل، قم بإعداد قائمة بـ 5 مؤثرين مشهورين في مدينة ${inputs.city} متخصصين في مجال ${inputs.field}. لكل مؤثر، اذكر اسمه أو حسابه على وسائل التواصل الاجتماعي، وقدم وصفًا موجزًا لمحتواه، وسببًا لاقتراحه. إذا لم تتمكن من العثور على 5، فاذكر العدد الذي وجدته. قدم الإجابة بتنسيق ماركداون منظم.`
-                : `Using Google Search, create a list of 5 popular influencers in ${inputs.city} specializing in the ${inputs.field} niche. For each influencer, state their name or social media handle, provide a brief description of their content, and a reason for the suggestion. If you cannot find 5, list as many as you can find. Provide the answer in a structured markdown format.`;
-            title = isArabic ? `مؤثرون في ${inputs.city} لمجال ${inputs.field}` : `Influencers in ${inputs.city} for ${inputs.field}`;
-            break;
-        case 'social_media_optimizer':
-            prompt = isArabic
-                ? `بناءً على أحدث نتائج بحث الويب للاتجاهات في صناعة ${inputs.field}، أنشئ استراتيجية نمو لوسائل التواصل الاجتماعي. قم بتضمين أقسام للجمهور المستهدف، وركائز المحتوى، ونصائح خاصة بالمنصات (لإنستغرام، تيك توك، و X)، واستراتيجية دعوة لاتخاذ إجراء. قدم النتيجة بتنسيق ماركداون واضح وسهل القراءة.`
-                : `Based on the latest web search results for trends in the ${inputs.field} industry, create a social media growth strategy. Include sections for target audience, content pillars, platform-specific tips (for Instagram, TikTok, and X), and a call-to-action strategy. Present the result in a clear, easy-to-read markdown format.`;
-            title = isArabic ? `استراتيجية تواصل اجتماعي لمجال ${inputs.field}` : `Social Media Strategy for ${inputs.field}`;
-            break;
-        default:
-             throw new Error(`Unknown grounded tool ID: ${toolId}`);
-    }
-    return { prompt, title };
+// This is a simplified example. In a real application, these would be more complex and nuanced.
+export const getPrompt = (
+  toolId: string,
+  inputs: Record<string, string | ImageInput>
+): string | GenerateContentParameters['contents'] => {
+  switch (toolId) {
+    case 'seo_assistant':
+      return `Generate a comprehensive SEO content brief for the topic: "${inputs.topic}". Include sections for target keywords (primary and secondary), search intent analysis, recommended content structure with H2/H3 headings, and key questions to answer.`;
+    case 'influencer_discovery':
+      return `Find 5 micro-influencers (5k-50k followers) in ${inputs.city} for the niche "${inputs.field}". For each influencer, provide their Instagram handle, a brief description of their content, and why they are a good fit. Use the handle for the section heading. Set the main title to "Micro-Influencers in ${inputs.city} for ${inputs.field}".${JSON_FORMAT_INSTRUCTION}`;
+    case 'social_media_optimizer':
+      return `Create a social media growth strategy for a company in the "${inputs.field}" industry. Provide 3 actionable content ideas, suggest the best platforms to focus on, and recommend optimal posting times. Set the main title to "Social Media Strategy for ${inputs.field}" and use "Actionable Content Ideas", "Recommended Platforms", and "Optimal Posting Times" as section headings.${JSON_FORMAT_INSTRUCTION}`;
+    case 'video_script_assistant':
+      return `Write an engaging 30-45 second video script for the following idea: "${inputs.idea}". The script should have a strong hook, a clear body, and a call-to-action. Format it with scene descriptions and dialogue. Set the main title to "Video Script: ${inputs.idea}" and create sections for "Hook", "Scene 1", "Call to Action", etc.${JSON_FORMAT_INSTRUCTION}`;
+    case 'short_form_factory':
+      if (inputs.image) {
+        const image = inputs.image as ImageInput;
+        return {
+          parts: [
+            { inlineData: { mimeType: image.mimeType, data: image.base64 } },
+            { text: `Generate 3 creative short-form video ideas based on this product image. For each idea, provide a title, a brief concept, and a suggested audio track. Set the main title to "Video Ideas for Product" and use "Idea 1", "Idea 2", etc. as section headings.${JSON_FORMAT_INSTRUCTION}` },
+          ],
+        };
+      }
+      return `Repurpose the following long-form content into 3 short-form video ideas. For each idea, pull out a key quote or concept to be the hook. Set the main title to "Short-Form Video Ideas" and use "Idea 1", "Idea 2", etc. as section headings. Content: "${inputs.source_text}"${JSON_FORMAT_INSTRUCTION}`;
+    case 'smm_content_plan':
+      return `Generate a 7-day social media content plan for ${inputs.platform} focusing on the topic "${inputs.topic}". For each day, provide a content theme, a specific post idea, and a suggested caption. Set the main title to "7-Day Content Plan for ${inputs.platform}" and use "Day 1", "Day 2", etc. as section headings.${JSON_FORMAT_INSTRUCTION}`;
+    case 'ads_ai_assistant':
+      return `Generate 3 variations of ad copy for a product with this description: "${inputs.product}". The target audience is "${inputs.audience}". Include a compelling headline, body text, and a call-to-action for each variation. Set the main title to "Ad Copy Variations" and use "Variation 1", "Variation 2", etc. as section headings.${JSON_FORMAT_INSTRUCTION}`;
+    case 'email_marketing':
+      return `Write a marketing email for the following campaign goal: "${inputs.goal}". Include a catchy subject line, a personalized greeting, an engaging body, and a clear call-to-action button text. Set the main title to "Marketing Email Draft" and create sections for "Subject Line" and "Email Body".${JSON_FORMAT_INSTRUCTION}`;
+    case 'customer_persona':
+      return `Create a detailed customer persona based on this information. Product/Service: "${inputs.product_service}". Target Audience Details: "${inputs.target_audience_details}". The persona should include a name, demographics, goals, challenges, and motivations. Set the main title to the persona's name and create sections for "Demographics", "Goals", "Challenges", and "Motivations".${JSON_FORMAT_INSTRUCTION}`;
+    default:
+      throw new Error(`Unknown tool ID: ${toolId}`);
+  }
 };
 
-export const getJsonPrompt = (toolId: string, inputs: Record<string, string>, language: Language, hasImage: boolean): string => {
-    const isArabic = language === 'ar';
-    const systemInstruction = isArabic
-        ? `أنت مساعد تسويق خبير. هدفك هو تقديم محتوى موجز وعملي ومبتكر بناءً على طلب المستخدم. قم دائمًا بإرجاع الاستجابة بتنسيق JSON المطلوب، باتباع المخطط المقدم. يجب أن تكون الاستجابة بالكامل باللغة العربية.`
-        : `You are an expert marketing assistant. Your goal is to provide concise, actionable, and creative content based on the user's request. Always return the response in the requested JSON format, following the provided schema.`;
-    
-    let userPrompt = '';
-
-    switch (toolId) {
-        case 'video_script_assistant':
-            userPrompt = isArabic
-                ? `اكتب نص فيديو مفصل بناءً على الفكرة التالية: "${inputs.idea}". يجب أن يتضمن النص أقسامًا للمقدمة، والمحتوى الرئيسي (مقسم إلى مشاهد أو نقاط رئيسية)، والخاتمة مع دعوة لاتخاذ إجراء. قم بتضمين اقتراحات للمرئيات أو الإجراءات على الشاشة.`
-                : `Write a detailed video script based on the following idea: "${inputs.idea}". The script should include sections for an introduction, the main content (broken down into scenes or key points), and an outro with a call to action. Include suggestions for visuals or on-screen actions.`;
-            break;
-        case 'short_form_factory':
-            if (inputs.source_text && inputs.source_text.trim() !== '') {
-                userPrompt = isArabic
-                    ? `حوّل المحتوى الطويل التالي إلى 3 أفكار لمقاطع فيديو قصيرة. لكل فكرة، قدم عنوانًا جذابًا، ومفهومًا موجزًا، ومرئيًا مقترحًا. المحتوى: "${inputs.source_text}"`
-                    : `Transform the following long-form content into 3 short-form video ideas. For each idea, provide a catchy title, a brief concept, and a suggested visual. Content: "${inputs.source_text}"`;
-            } else if (hasImage) {
-                 userPrompt = isArabic
-                    ? `حلل صورة المنتج المقدمة وأنشئ 3 أفكار لمقاطع فيديو قصيرة للترويج لها. لكل فكرة، قدم عنوانًا جذابًا، ومفهومًا موجزًا، ومرئيًا مقترحًا.`
-                    : `Analyze the provided product image and generate 3 short-form video ideas to promote it. For each idea, provide a catchy title, a brief concept, and a suggested visual.`;
-            } else {
-                 throw new Error(isArabic ? "يرجى تقديم محتوى طويل أو تحميل صورة." : "Please provide either long-form content or upload an image.");
-            }
-            break;
-        case 'smm_content_plan':
-            userPrompt = isArabic
-                ? `أنشئ خطة محتوى لوسائل التواصل الاجتماعي لمدة 7 أيام لمنصة ${inputs.platform} حول موضوع "${inputs.topic}". لكل يوم، قدم فكرة للمحتوى، وتعليقًا، وهاشتاجات ذات صلة.`
-                : `Generate a 7-day social media content plan for the platform ${inputs.platform} on the topic of "${inputs.topic}". For each day, provide a content idea, a caption, and relevant hashtags.`;
-            break;
-        case 'ads_ai_assistant':
-            userPrompt = isArabic
-                ? `أنشئ مجموعة من النصوص الإعلانية لحملة. المنتج هو: "${inputs.product}". الجمهور المستهدف هو: "${inputs.audience}". أنشئ عنوانًا، وأقسامًا لتنويعات النصوص الإعلانية (3 على الأقل)، وقائمة بالدعوات لاتخاذ إجراء المقنعة.`
-                : `Create a set of ad copies for a campaign. The product is: "${inputs.product}". The target audience is: "${inputs.audience}". Generate a title, sections for Ad Copy Variations (at least 3), and a list of compelling Calls to Action.`;
-            break;
-        case 'email_marketing':
-            userPrompt = isArabic
-                ? `اكتب نصًا للتسويق عبر البريد الإلكتروني للهدف التالي: "${inputs.goal}". يجب أن يتضمن الناتج سطر موضوع جذاب، ونصًا مقنعًا، ودعوة واضحة لاتخاذ إجراء.`
-                : `Write an email marketing copy for the following goal: "${inputs.goal}". The output should include a catchy subject line, a compelling body, and a clear call to action.`;
-            break;
-        case 'customer_persona':
-            userPrompt = isArabic
-                ? `أنشئ شخصية عميل مفصلة لشركة تبيع "${inputs.product_service}" إلى "${inputs.target_audience_details}". قم بتضمين أقسام للتركيبة السكانية، والأهداف، والتحديات، وسيرة ذاتية موجزة.`
-                : `Create a detailed customer persona for a company that sells "${inputs.product_service}" to "${inputs.target_audience_details}". Include sections for Demographics, Goals, Challenges, and a brief Bio.`;
-            break;
-        default:
-             throw new Error(`Unknown tool ID for JSON generation: ${toolId}`);
-    }
-    return `${systemInstruction}\n\nUser Request: ${userPrompt}`;
+export const getSystemInstruction = (toolId: string): string => {
+  switch (toolId) {
+    case 'seo_assistant':
+      return 'You are an expert SEO strategist and content planner. Provide detailed, actionable advice.';
+    case 'influencer_discovery':
+      return 'You are a talent scout specializing in social media influencers. Focus on authenticity and engagement metrics.';
+    case 'social_media_optimizer':
+      return 'You are a social media marketing manager with a track record of growing online communities. Your advice is creative and data-driven.';
+    case 'video_script_assistant':
+    case 'short_form_factory':
+      return 'You are a creative director and scriptwriter specializing in viral short-form video content for platforms like TikTok and Instagram Reels.';
+    case 'smm_content_plan':
+      return 'You are a content calendar specialist. You create structured, engaging, and platform-specific content plans.';
+    case 'ads_ai_assistant':
+      return 'You are a direct-response copywriter who excels at writing high-converting ad copy. Your tone is persuasive and clear.';
+    case 'email_marketing':
+      return 'You are an email marketing expert who crafts emails that get opened, read, and clicked.';
+    case 'customer_persona':
+      return 'You are a market researcher and strategist. You create rich, detailed customer personas to guide marketing efforts.';
+    default:
+      return 'You are a helpful marketing assistant. Your goal is to provide creative and strategic content for marketing professionals.';
+  }
 };
-
-export const getVideoPrompt = (prompt: string, language: Language): string => {
-    return language === 'ar'
-        ? `أنشئ فيديو عالي الجودة بناءً على الفكرة التالية: "${prompt}"`
-        : `Create a high-quality video based on the following idea: "${prompt}"`;
-}

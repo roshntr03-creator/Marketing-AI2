@@ -3,7 +3,6 @@ import { auth, db } from '../lib/firebaseClient.ts';
 import { type Generation, type GeneratedContentData } from '../types.ts';
 // FIX: Import firebase compat to access the Timestamp type.
 import firebase from 'firebase/compat/app';
-import { onAuthStateChanged } from 'firebase/auth';
 
 const CACHE_KEY = 'generationHistory';
 
@@ -25,7 +24,7 @@ export const useHistory = () => {
             console.error("Failed to load history from cache", e);
         }
 
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
             if (user) {
                 // Only show skeleton if cache was empty and we are doing the initial fetch.
                 if (history.length === 0) {

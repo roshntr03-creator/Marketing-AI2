@@ -1,199 +1,143 @@
-import { useState, useCallback, useEffect } from 'react';
-import { type Tool, type GeneratedContentData, type Generation } from '../types.ts';
-import { useLocalization } from './useLocalization.ts';
-import { generateContentForTool, generateVideo } from '../services/geminiService.ts';
-import { triggerHapticFeedback } from '../lib/haptics.ts';
-import { useToasts } from './useToasts.ts';
-import { useAuth } from './useAuth.ts';
-import { db } from '../lib/firebaseClient.ts';
-// FIX: Import firebase compat to use FieldValue.serverTimestamp() for the v8/compat API.
+import { useState, useCallback } from 'react';
+import { type Tool, type GeneratedContentData } from '../types.ts';
+import { db, auth } from '../lib/firebaseClient.ts';
+// FIX: Add compat import for FieldValue
 import firebase from 'firebase/compat/app';
+import { useToasts } from './useToasts.ts';
+import { useLocalization } from './useLocalization.ts';
+import { processJsonResponse, processGroundedResponse } from '../services/gemini/parser.ts';
+import { callGenerateContentApi, generateVideoApi } from '../services/gemini/api.ts';
 
-const CACHE_KEY = 'generationHistory';
-const groundedTools = ['seo_assistant', 'influencer_discovery', 'social_media_optimizer'];
-
+type Inputs = Record<string, string | File>;
 
 export const useToolRunner = (tool: Tool) => {
-  const { t, language } = useLocalization();
-  const { addToast } = useToasts();
-  const { user } = useAuth();
-  const [inputs, setInputs] = useState<Record<string, string | File>>({});
-  const [imagePreview, setImagePreview] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
+  const [inputs, setInputs] = useState<Inputs>({});
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generatedContent, setGeneratedContent] = useState<GeneratedContentData | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState('');
+  const [result, setResult] = useState<GeneratedContentData | string | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
+  const { addToast } = useToasts();
+  const { t } = useLocalization();
 
-  useEffect(() => {
-    // Cleanup function to revoke the object URL
-    return () => {
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
-      }
-    };
-  }, [videoUrl]);
-
-  const saveGeneration = async (output: GeneratedContentData | string) => {
-    if (!user) return;
-
-    const textInputs = Object.fromEntries(
-      Object.entries(inputs).filter(([, value]) => typeof value === 'string')
-    );
-    
-    try {
-      // FIX: Refactor to use v8 compat API (db.collection().add()) to resolve module errors.
-      const docRef = await db.collection('generations').add({
-        userId: user.uid,
-        tool_id: tool.id,
-        inputs: textInputs,
-        output: output,
-        // FIX: Use compat serverTimestamp.
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-
-      // Update local cache for instant UI feedback
-      const newGeneration: Generation = {
-        id: docRef.id,
-        created_at: new Date().toISOString(), // Approximate for immediate UI
-        tool_id: tool.id,
-        inputs: textInputs,
-        output: output as GeneratedContentData, // Assuming correct type for cache
-      };
-      
-      const cachedHistoryRaw = localStorage.getItem(CACHE_KEY);
-      const cachedHistory: Generation[] = cachedHistoryRaw ? JSON.parse(cachedHistoryRaw) : [];
-      const updatedHistory = [newGeneration, ...cachedHistory];
-      localStorage.setItem(CACHE_KEY, JSON.stringify(updatedHistory));
-
-    } catch (error) {
-      console.error('Failed to save generation:', error);
-    }
+  const setInputValue = (name: string, value: string | File) => {
+    setInputs((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleInputChange = (name: string, value: string) => {
-    setInputs(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleFileChange = (name: string, file: File | null) => {
-    if (file) {
-      setInputs(prev => ({ ...prev, [name]: file }));
+  const handleFileSelect = (file: File) => {
+    const imageInput = tool.inputs.find((i) => i.type === 'image');
+    if (imageInput) {
+      setInputValue(imageInput.name, file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(prev => ({ ...prev, [name]: reader.result as string }));
+        setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-    } else {
-      setInputs(prev => {
-        const newInputs = { ...prev };
-        delete newInputs[name];
-        return newInputs;
-      });
-      setImagePreview(prev => {
-        const newPreviews = { ...prev };
-        delete newPreviews[name];
-        return newPreviews;
-      });
     }
   };
 
-  const onRetry = useCallback((delaySeconds: number) => {
-    setStatus(t('retry_in').replace('{seconds}', delaySeconds.toString()));
-  }, [t]);
+  const handleClearImage = () => {
+    const imageInput = tool.inputs.find((i) => i.type === 'image');
+    if (imageInput) {
+      const newInputs = { ...inputs };
+      delete newInputs[imageInput.name];
+      setInputs(newInputs);
+    }
+    setImagePreview(null);
+  };
 
-  const onVideoStatusUpdate = useCallback((statusKey: string) => {
-    setStatus(t(statusKey));
-  }, [t]);
+  const saveToHistory = async (generationResult: GeneratedContentData | string) => {
+    if (!auth.currentUser) return;
+
+    // For video generation, we save the prompt instead of the temporary blob URL.
+    const outputToStore = tool.id === 'video_generator' ? (inputs.prompt as string) : generationResult;
+
+    // Remove file objects from inputs before saving to firestore
+    const storableInputs: Record<string, string> = {};
+    for (const key in inputs) {
+      if (typeof inputs[key] === 'string') {
+        storableInputs[key] = inputs[key] as string;
+      }
+    }
+
+    try {
+      await db.collection('generations').add({
+        userId: auth.currentUser.uid,
+        tool_id: tool.id,
+        inputs: storableInputs,
+        output: outputToStore,
+        // FIX: Use compat FieldValue
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      console.error('Failed to save generation to history:', e);
+      // Don't bother the user with this error.
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    triggerHapticFeedback();
-
-    if (tool.id === 'short_form_factory') {
-      const hasText = inputs.source_text && typeof inputs.source_text === 'string' && inputs.source_text.trim() !== '';
-      const hasImage = inputs.image && inputs.image instanceof File;
-      if (!hasText && !hasImage) {
-        setError(t('short_form_factory_error'));
-        return;
-      }
-    }
-
-    if (videoUrl) {
-      URL.revokeObjectURL(videoUrl);
-    }
-
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
-    setGeneratedContent(null);
-    setVideoUrl(null);
-    setStatus(t('generating_content'));
-
-    const isStreamable = groundedTools.includes(tool.id);
+    setResult(null);
+    setLoadingStatus(t('generating_content'));
 
     try {
       if (tool.id === 'video_generator') {
+        setLoadingStatus("Starting video generation... this can take several minutes.");
         const prompt = inputs.prompt as string;
-        if (!prompt) throw new Error("Prompt is required for video generation.");
-        const resultUrl = await generateVideo(prompt, language, onVideoStatusUpdate, onRetry);
-        setVideoUrl(resultUrl);
-        addToast(t('video_gen_complete_toast'), 'success');
-        saveGeneration(prompt);
-      } else if (isStreamable) {
-        // Handle streaming for grounded tools
-        setGeneratedContent({
-          title: t(tool.nameKey),
-          sections: [{ heading: 'AI-Generated Analysis', content: '' }],
-        });
-
-        const onStreamUpdate = (chunk: string) => {
-          setGeneratedContent(prev => {
-            if (!prev) return null; // Should not happen
-            const newContent = (prev.sections[0].content || '') + chunk;
-            return {
-              ...prev,
-              sections: [{ ...prev.sections[0], content: newContent }],
-            };
-          });
-        };
-        
-        const finalResult = await generateContentForTool(tool.id, inputs, language, onRetry, onStreamUpdate);
-        setGeneratedContent(finalResult); // Set final, polished content
-        saveGeneration(finalResult);
+        if (!prompt) {
+          throw new Error("Video prompt cannot be empty.");
+        }
+        const videoUrl = await generateVideoApi(prompt);
+        setResult(videoUrl);
+        await saveToHistory(videoUrl); // Pass blob url, saveToHistory will handle it
       } else {
-        // Handle non-streaming tools
-        const result = await generateContentForTool(tool.id, inputs, language, onRetry);
-        setGeneratedContent(result);
-        saveGeneration(result);
+        const data = await callGenerateContentApi(tool.id, inputs);
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        let processedResult: GeneratedContentData;
+        if (data.sources) {
+          const title = `AI Insights on "${Object.values(inputs)[0]}"`;
+          processedResult = processGroundedResponse(data.text, title);
+          processedResult.sources = data.sources;
+        } else {
+          processedResult = processJsonResponse(data.text);
+        }
+        setResult(processedResult);
+        await saveToHistory(processedResult);
       }
     } catch (err: any) {
-      console.error("Tool Runner Error:", err);
-      
-      const functionError = err.context?.error;
-      const functionHint = err.context?.hint;
-      
-      let detailedError = functionError || err.message || t('error_generating');
-      if(functionHint) {
-        detailedError = `${detailedError} (Hint: ${functionHint})`;
+      console.error('Error during generation:', err);
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+      if (err.message) {
+        errorMessage = err.message;
       }
-
-      setError(detailedError);
-      setGeneratedContent(null); // Clear partial content on error
+      if (err.code === 'unavailable') {
+        errorMessage = 'Could not connect to the server. Please check your internet connection.';
+      }
+      setError(errorMessage);
+      addToast(errorMessage, 'error');
     } finally {
-      setLoading(false);
-      setStatus('');
+      setIsLoading(false);
+      setLoadingStatus(null);
     }
   };
 
   return {
     inputs,
+    setInputValue,
     imagePreview,
-    loading,
-    error,
-    generatedContent,
-    videoUrl,
-    status,
-    handleInputChange,
-    handleFileChange,
+    handleFileSelect,
+    handleClearImage,
     handleSubmit,
+    isLoading,
+    isPolling: false, // Polling is now done on the server
+    error,
+    result,
+    retryStatus: loadingStatus, // Re-use retryStatus for general loading messages
   };
 };

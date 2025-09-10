@@ -12,7 +12,7 @@
   "engines": {
     "node": "18"
   },
-  "main": "lib/index.js",
+  "main": "lib/firebase/functions/index.js",
   "dependencies": {
     "@google/genai": "^1.17.0",
     "cors": "^2.8.5",

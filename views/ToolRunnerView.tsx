@@ -1,11 +1,11 @@
 import React from 'react';
-import { type Tool, type InputField } from '../types.ts';
+import { type Tool, type GeneratedContentData, type InputField } from '../types.ts';
 import { useLocalization } from '../hooks/useLocalization.ts';
-import LoadingSpinner from '../components/LoadingSpinner.tsx';
-import GeneratedContent from '../components/GeneratedContent.tsx';
-import LottieAnimation from '../components/LottieAnimation.tsx';
 import { useToolRunner } from '../hooks/useToolRunner.ts';
 import ImageUpload from '../components/ImageUpload.tsx';
+import GeneratedContent from '../components/GeneratedContent.tsx';
+import SkeletonLoader from '../components/SkeletonLoader.tsx';
+import LottieAnimation from '../components/LottieAnimation.tsx';
 
 interface ToolRunnerViewProps {
   tool: Tool;
@@ -16,111 +16,118 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
   const { t } = useLocalization();
   const {
     inputs,
+    setInputValue,
     imagePreview,
-    loading,
-    error,
-    generatedContent,
-    videoUrl,
-    status,
-    handleInputChange,
-    handleFileChange,
+    handleFileSelect,
+    handleClearImage,
     handleSubmit,
+    isLoading,
+    error,
+    result,
+    retryStatus, // This now holds general loading status messages
   } = useToolRunner(tool);
 
-  const renderInputField = (field: InputField) => {
-    switch (field.type) {
+  const renderInput = (inputField: InputField) => {
+    switch (inputField.type) {
       case 'textarea':
         return (
           <textarea
-            id={field.name}
-            name={field.name}
+            id={inputField.name}
+            name={inputField.name}
+            value={(inputs[inputField.name] as string) || ''}
+            onChange={(e) => setInputValue(inputField.name, e.target.value)}
+            placeholder={t(inputField.placeholderKey)}
+            className="w-full p-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md h-32 focus:ring-cyan-500 focus:border-cyan-500"
             rows={5}
-            placeholder={t(field.placeholderKey)}
-            onChange={(e) => handleInputChange(field.name, e.target.value)}
-            className="w-full p-2 bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-cyan-500 focus:border-cyan-500"
           />
         );
       case 'image':
         return (
-            <ImageUpload 
-                label={t(field.labelKey)}
-                previewSrc={imagePreview[field.name] || null}
-                onFileSelect={(file) => handleFileChange(field.name, file)}
-                onClear={() => handleFileChange(field.name, null)}
-            />
+          <ImageUpload
+            previewSrc={imagePreview}
+            onFileSelect={handleFileSelect}
+            onClear={handleClearImage}
+            label={t(inputField.labelKey)}
+          />
         );
       case 'text':
       default:
         return (
           <input
+            id={inputField.name}
+            name={inputField.name}
             type="text"
-            id={field.name}
-            name={field.name}
-            placeholder={t(field.placeholderKey)}
-            onChange={(e) => handleInputChange(field.name, e.target.value)}
-            className="w-full p-2 bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-cyan-500 focus:border-cyan-500"
+            value={(inputs[inputField.name] as string) || ''}
+            onChange={(e) => setInputValue(inputField.name, e.target.value)}
+            placeholder={t(inputField.placeholderKey)}
+            className="w-full p-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-cyan-500 focus:border-cyan-500"
           />
         );
     }
   };
 
-  const isResultView = generatedContent || videoUrl;
+  const renderResult = () => {
+    if (typeof result === 'string') {
+      // Handle video URL result (now a blob URL)
+      return (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 animate-fade-in text-center">
+          <h2 className="text-2xl font-bold mb-4 text-cyan-500 dark:text-cyan-400">{t('video_ready')}</h2>
+          <video controls autoPlay src={result} className="w-full max-w-md mx-auto rounded-lg shadow-lg"></video>
+        </div>
+      );
+    }
+    if (result) {
+      return <GeneratedContent data={result as GeneratedContentData} />;
+    }
+    return null;
+  };
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <div className="flex items-center mb-6">
-        <button onClick={onBack} className="text-gray-500 dark:text-gray-400 hover:text-cyan-500 p-2 rounded-full mr-2 rtl:mr-0 rtl:ml-2">
-            <i className="fa-solid fa-arrow-left rtl:fa-arrow-right text-xl"></i>
+        <button
+          onClick={onBack}
+          className="text-gray-500 dark:text-gray-400 hover:text-cyan-500 dark:hover:text-cyan-400 p-2 rounded-full mr-2 rtl:mr-0 rtl:ml-2"
+        >
+          <i className="fa-solid fa-arrow-left rtl:fa-arrow-right text-xl"></i>
         </button>
         <div>
-            <h1 className="text-2xl font-bold">{t(tool.nameKey)}</h1>
-            <p className="text-gray-600 dark:text-gray-400">{t(tool.descriptionKey)}</p>
+          <h1 className="text-2xl font-bold">{t(tool.nameKey)}</h1>
+          <p className="text-gray-500 dark:text-gray-400">{t(tool.descriptionKey)}</p>
         </div>
       </div>
-      
-      {!isResultView && (
+
+      {!result && (
         <form onSubmit={handleSubmit} className="space-y-4">
-          {tool.inputs.map(field => (
-            <div key={field.name}>
-                {field.type !== 'image' && (
-                     <label htmlFor={field.name} className="block text-sm font-medium mb-1">{t(field.labelKey)}</label>
-                )}
-              {renderInputField(field)}
+          {tool.inputs.map((inputField) => (
+            <div key={inputField.name}>
+              <label htmlFor={inputField.name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t(inputField.labelKey)}
+              </label>
+              {renderInput(inputField)}
             </div>
           ))}
           <button
             type="submit"
-            disabled={loading}
-            className="w-full flex justify-center items-center px-4 py-3 bg-cyan-500 text-white font-bold rounded-lg hover:bg-cyan-600 disabled:bg-cyan-300 transition-colors"
+            disabled={isLoading}
+            className="w-full px-4 py-3 bg-cyan-500 text-white font-semibold rounded-md hover:bg-cyan-600 disabled:bg-cyan-300 disabled:cursor-not-allowed"
           >
-            {loading ? <LoadingSpinner /> : <><i className="fa-solid fa-wand-magic-sparkles mr-2"></i> {t('generate')}</>}
+            {isLoading ? '...' : t('generate')}
           </button>
         </form>
       )}
 
-      {loading && !isResultView && (
-        <div className="mt-6 text-center">
-            <p className="mb-4">{status || t('generating_content')}</p>
-            {tool.id !== 'video_generator' ? <LottieAnimation /> : <LoadingSpinner />}
-        </div>
-      )}
-      
-      {error && <p className="mt-4 text-center text-red-500">{error}</p>}
-      
-      {generatedContent && (
-        <div className="mt-6">
-            <GeneratedContent data={generatedContent} />
+      {isLoading && (
+        <div className="mt-8 text-center">
+          <LottieAnimation />
+          <p className="text-lg font-semibold">{retryStatus || t('generating_content')}</p>
+          <SkeletonLoader />
         </div>
       )}
 
-      {videoUrl && (
-        <div className="mt-6">
-          <h2 className="text-xl font-bold mb-4">{t('video_ready')}</h2>
-          <video controls src={videoUrl} className="w-full rounded-lg shadow-lg">
-            Your browser does not support the video tag.
-          </video>
-        </div>
-      )}
+      {error && <p className="mt-4 text-red-500 bg-red-100 dark:bg-red-900/50 p-3 rounded-md">{error}</p>}
+
+      <div className="mt-8">{renderResult()}</div>
     </div>
   );
 };

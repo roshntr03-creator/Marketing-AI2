@@ -1,9 +1,7 @@
-import { GenerateContentResponse } from "@google/genai";
 import { GeneratedContentData } from "../../types.ts";
 
-export const processJsonResponse = (response: GenerateContentResponse): GeneratedContentData => {
+export const processJsonResponse = (rawJson: string): GeneratedContentData => {
     try {
-        const rawJson = response.text;
         if (!rawJson) {
             throw new Error("Empty response from API.");
         }
@@ -21,7 +19,7 @@ export const processJsonResponse = (response: GenerateContentResponse): Generate
 
         return data;
     } catch (e) {
-        console.error("Failed to parse Gemini response:", e, response.text);
+        console.error("Failed to parse Gemini response:", e, rawJson);
         throw new Error("Failed to parse AI response. Please try again.");
     }
 };

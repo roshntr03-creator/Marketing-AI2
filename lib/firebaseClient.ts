@@ -1,8 +1,10 @@
-import { initializeApp, type FirebaseOptions } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-// FIX: Import firebase compat libraries to use the v8 API for Firestore.
+import { type FirebaseOptions } from 'firebase/app';
+// FIX: Import firebase compat libraries to use the v8 API for all services.
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
+import 'firebase/compat/auth';
+import 'firebase/compat/functions';
+
 
 // This configuration has been updated with the user-provided Firebase project details.
 // Exported to allow dynamic URL creation for Cloud Functions.
@@ -16,16 +18,18 @@ export const firebaseConfig: FirebaseOptions = {
   measurementId: "G-436HC96G3L"
 };
 
-// Initialize Firebase modular app
-const app = initializeApp(firebaseConfig);
-// FIX: Initialize compat app to get access to compat services like firestore
+// Initialize Firebase using the compat library to ensure a single app instance.
+// This instance will be used by all compat services.
 if (firebase.apps.length === 0) {
   firebase.initializeApp(firebaseConfig);
 }
 
+// Get the default Firebase app instance initialized by the compat library.
+const app = firebase.app();
 
-// Get Firebase services
-const auth = getAuth(app); // Keep using modular auth
-const db = firebase.firestore(); // Use compat firestore to fix module errors
+// Get Firebase services using the v8 compatibility API.
+const auth = firebase.auth();
+const db = firebase.firestore(); 
+const functions = firebase.functions();
 
-export { app, auth, db };
+export { app, auth, db, functions };

@@ -51,7 +51,15 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // We'll use a "cache first" strategy for navigation and app shell requests.
+    const requestUrl = new URL(event.request.url);
+
+    // Let the browser handle requests for Firebase services to prevent interference.
+    // This is crucial for Firestore's real-time connection and other Google APIs.
+    if (requestUrl.hostname.includes('googleapis.com') || requestUrl.hostname.includes('cloudfunctions.net')) {
+        return; // Do not intercept. Let the browser handle it natively.
+    }
+
+    // For all other non-API requests, apply the "cache first" strategy.
     event.respondWith(
         caches.match(event.request)
             .then((cachedResponse) => {
@@ -66,11 +74,8 @@ self.addEventListener('fetch', (event) => {
                         // Clone the response because it can only be read once.
                         const responseToCache = networkResponse.clone();
                         
-                        // Don't cache API calls to Supabase or Gemini to avoid stale data.
-                        const isApiCall = event.request.url.includes('supabase.co') || event.request.url.includes('googleapis.com');
-                        
                         // We should only cache successful GET requests.
-                        if (event.request.method === 'GET' && !isApiCall) {
+                        if (event.request.method === 'GET') {
                             caches.open(CACHE_NAME)
                                 .then((cache) => {
                                     cache.put(event.request, responseToCache);

@@ -20,7 +20,9 @@
     "express": "https://aistudiocdn.com/express@^5.1.0",
     "firebase-admin": "https://aistudiocdn.com/firebase-admin@^13.5.0",
     "stream": "https://aistudiocdn.com/stream@^0.0.3",
-    "webworker": "https://aistudiocdn.com/webworker@^0.8.4"
+    "webworker": "https://aistudiocdn.com/webworker@^0.8.4",
+    "firebase-functions": "https://aistudiocdn.com/firebase-functions@^6.4.0",
+    "cors": "https://aistudiocdn.com/cors@^2.8.5"
   }
 }
 </script>
@@ -48,10 +50,11 @@
     }
   </style>
   <link rel="stylesheet" href="/index.css">
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 font-sans">
   <noscript>You need to enable JavaScript to run this app.</noscript>
   <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
+  <script type="text/babel" data-type="module" src="/index.tsx"></script>
 </body>
 </html>

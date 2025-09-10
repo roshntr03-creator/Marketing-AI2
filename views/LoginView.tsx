@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 import { auth } from '../lib/firebaseClient.ts';
-import {
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider,
-} from 'firebase/auth';
+import firebase from 'firebase/compat/app';
 import { useLocalization } from '../hooks/useLocalization.ts';
 import Logo from '../components/Logo.tsx';
 
@@ -20,7 +16,7 @@ const LoginView: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await auth.signInWithEmailAndPassword(email, password);
     } catch (err: any) {
       setError(err.message);
     }
@@ -31,7 +27,7 @@ const LoginView: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
     } catch (err: any) {
       setError(err.message);
     }
