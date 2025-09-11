@@ -26,6 +26,15 @@
             "value": "application/javascript; charset=utf-8"
           }
         ]
+      },
+      {
+        "source": "/manifest.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json; charset=utf-8"
+          }
+        ]
       }
     ],
     "rewrites": [
