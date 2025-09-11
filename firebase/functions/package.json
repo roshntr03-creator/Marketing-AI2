@@ -14,15 +14,15 @@
   },
   "main": "lib/index.js",
   "dependencies": {
-    "@google/genai": "^1.17.0",
+    "@google/genai": "^1.18.0",
     "cors": "^2.8.5",
-    "firebase-admin": "^11.11.1",
-    "firebase-functions": "^3.24.1"
+    "firebase-admin": "^12.1.1",
+    "firebase-functions": "^4.9.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "firebase-functions-test": "^3.1.0",
+    "firebase-functions-test": "^3.4.1",
     "typescript": "^5.0.0"
   },
   "private": true

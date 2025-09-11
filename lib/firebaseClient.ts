@@ -1,9 +1,10 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-// FIX: Using a namespace import to address module resolution errors for 'getFunctions' and 'httpsCallable'.
-// This pattern can help in environments where tree-shaking or bundler configurations cause issues with named exports.
-import * as fbFunctions from 'firebase/functions';
+// FIX: Resolved a module resolution error. The original 'firebase/functions' import
+// was ambiguous and conflicted with the local backend functions directory.
+// Importing directly from '@firebase/functions' ensures the correct client SDK is loaded.
+import { getFunctions, httpsCallable } from '@firebase/functions';
 
 // This configuration has been updated with the user-provided Firebase project details.
 // Exported to allow dynamic URL creation for Cloud Functions.
@@ -24,9 +25,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 // Specify the region for the functions instance.
-const functions = fbFunctions.getFunctions(app, 'us-central1');
+const functions = getFunctions(app, 'us-central1');
 
-// Re-export httpsCallable under its original name for other files that consume it.
-const httpsCallable = fbFunctions.httpsCallable;
+// Using named imports, `httpsCallable` is now directly available for export.
 
 export { app, auth, db, functions, httpsCallable };
