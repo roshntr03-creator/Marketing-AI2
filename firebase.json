@@ -18,16 +18,7 @@
     ],
     "headers": [
       {
-        "source": "**/*.tsx",
-        "headers": [
-          {
-            "key": "Content-Type",
-            "value": "application/javascript; charset=utf-8"
-          }
-        ]
-      },
-      {
-        "source": "**/*.ts",
+        "source": "**/*.@(ts|tsx)",
         "headers": [
           {
             "key": "Content-Type",
