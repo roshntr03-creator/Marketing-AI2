@@ -2,27 +2,24 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 
+/**
+ * Entry point for the Marketing AI Pro application.
+ * This file handles the initial rendering of the React application.
+ */
+
 const rootElement = document.getElementById('root');
+
 if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
+  // A critical error that prevents the app from starting.
+  throw new Error("Fatal Error: The root element with ID 'root' was not found in the DOM.");
 }
 
 const root = ReactDOM.createRoot(rootElement);
+
+// Render the main application component within React's StrictMode
+// to highlight potential problems in the app during development.
 root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
-
-// Register the service worker to enable PWA functionality.
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then(registration => {
-        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-      })
-      .catch(error => {
-        console.log('ServiceWorker registration failed: ', error);
-      });
-  });
-}

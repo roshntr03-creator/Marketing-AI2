@@ -1,51 +1,64 @@
 import { functions, auth } from '../../lib/firebaseClient.ts';
 import { firebaseConfig } from '../../lib/firebaseClient.ts';
+import { GeneratedContentData } from '../../types';
 
-// Type definition for image data sent to the backend.
+/** Type definition for image data sent to the backend. */
 export interface ImageInput {
     base64: string;
     mimeType: string;
 }
 
-const generateContentCallable = functions.httpsCallable('generateContent');
+// FIX: Use httpsCallable from the v8 compat 'functions' instance, not from the v9 'firebase/functions' module.
+const generateContentFunction = functions.httpsCallable('generateContent');
 
 /**
- * Calls the `generateContent` Firebase Function for text-based tools.
+ * Converts a File object to a base64 encoded string.
+ * @param file The file to convert.
+ * @returns A promise that resolves with the base64 string.
+ */
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = (error) => reject(error);
+    });
+};
+
+/**
+ * Calls the `generateContent` Firebase Function. It handles both text-based
+ * and image-based tools by converting files to base64 before sending.
  * @param toolId The ID of the tool being used.
  * @param inputs The user inputs for the tool.
  * @returns The response data from the cloud function.
  */
-export const callGenerateContentApi = async (toolId: string, inputs: Record<string, string | File>) => {
-    let payload: any = { toolId: toolId, inputs: {} };
+export const callGenerateContentApi = async (toolId: string, inputs: Record<string, string | File>): Promise<{text: string, sources?: any[]}> => {
+    const payload: { toolId: string, inputs: Record<string, string | ImageInput> } = { 
+        toolId, 
+        inputs: {} 
+    };
     
     // Process inputs, converting files to base64
     for (const key in inputs) {
-        if (inputs[key] instanceof File) {
-            const file = inputs[key] as File;
-            const base64 = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve((reader.result as string).split(',')[1]);
-                reader.onerror = (error) => reject(error);
-            });
-            payload.inputs[key] = {
-                base64,
-                mimeType: file.type,
-            };
+        const value = inputs[key];
+        if (value instanceof File) {
+            const base64 = await fileToBase64(value);
+            payload.inputs[key] = { base64, mimeType: value.type };
         } else {
-            payload.inputs[key] = inputs[key];
+            payload.inputs[key] = value;
         }
     }
     
-    const response = await generateContentCallable(payload);
-    return response.data;
+    const response = await generateContentFunction(payload);
+    return response.data as {text: string, sources?: any[]};
 };
 
 /**
- * Calls the `generateVideo` Firebase Function, waits for the streaming
- * response, and returns a local blob URL for the video.
+ * Calls the `generateVideo` Firebase Function. This function handles streaming
+ * the video response from the server and returns a local blob URL for playback.
  * @param prompt The text prompt for video generation.
- * @returns A local blob URL for the generated video.
+ * @returns A promise that resolves with a local blob URL for the generated video.
+ * @throws An error if authentication fails or the server returns an error.
  */
 export const generateVideoApi = async (prompt: string): Promise<string> => {
     const user = auth.currentUser;
@@ -54,7 +67,7 @@ export const generateVideoApi = async (prompt: string): Promise<string> => {
     }
     const token = await user.getIdToken();
 
-    // Construct the URL for the cloud function.
+    // The URL is constructed dynamically from the Firebase project config.
     const functionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/generateVideo`;
 
     const response = await fetch(functionUrl, {
@@ -68,13 +81,15 @@ export const generateVideoApi = async (prompt: string): Promise<string> => {
 
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Video generation failed: ${response.status} ${errorText}`);
+        console.error("Video generation failed:", response.status, errorText);
+        throw new Error(`Video generation failed: ${errorText || response.statusText}`);
     }
 
     const blob = await response.blob();
     if (blob.type !== 'video/mp4') {
-        throw new Error('The server did not return a valid video file.');
+        throw new Error('The server did not return a valid video file. Please try again.');
     }
     
+    // Create a local URL for the video blob to be used in the <video> tag.
     return URL.createObjectURL(blob);
 };

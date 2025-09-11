@@ -1,22 +1,27 @@
 import React from 'react';
-import { useTheme } from '../hooks/useTheme.ts';
 
 const AnalyticsChart: React.FC = () => {
-    const { theme } = useTheme();
-    const isDark = theme === 'dark';
-
-    const barHeights = [40, 60, 50, 75, 65, 85, 95];
+    const barData = [
+        { height: 40, delay: 0 },
+        { height: 60, delay: 100 },
+        { height: 50, delay: 200 },
+        { height: 75, delay: 300 },
+        { height: 65, delay: 400 },
+        { height: 85, delay: 500 },
+        { height: 95, delay: 600 },
+    ];
 
     return (
-        <div className="w-full h-48 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg flex items-end justify-around space-x-2 rtl:space-x-reverse">
-            {barHeights.map((height, index) => (
-                <div key={index} className="w-full bg-cyan-400/50 rounded-t-md animate-pulse" style={{ 
-                    height: `${height}%`,
-                    animationDelay: `${index * 100}ms`
-                }}>
+        <div className="w-full h-48 p-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl flex items-end justify-around space-x-2 rtl:space-x-reverse shadow-lg">
+            {barData.map(({ height, delay }, index) => (
+                <div 
+                    key={index} 
+                    className="w-full bg-cyan-400/30 dark:bg-cyan-500/30 rounded-t-md" 
+                    style={{ height: `${height}%` }}
+                >
                     <div 
-                        className="w-full bg-cyan-400 rounded-t-md transition-all duration-500"
-                        style={{ height: '100%' }}
+                        className="w-full bg-cyan-400 dark:bg-cyan-500 rounded-t-md animate-pulse"
+                        style={{ height: '100%', animationDelay: `${delay}ms`, animationDuration: '2s' }}
                     ></div>
                 </div>
             ))}
@@ -24,4 +29,4 @@ const AnalyticsChart: React.FC = () => {
     );
 };
 
-export default AnalyticsChart;
+export default React.memo(AnalyticsChart);

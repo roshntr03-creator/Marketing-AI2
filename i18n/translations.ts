@@ -20,6 +20,8 @@ const translations = {
     password: 'Password',
     login: 'Login',
     login_with_google: 'Login with Google',
+    login_to_account: 'Login to your account',
+    or_continue_with: 'Or continue with',
 
     // Dashboard
     welcome_back: 'Welcome back',
@@ -122,6 +124,7 @@ const translations = {
     // AI Video Generator
     ai_video_generator_name: 'AI Video Generator',
     ai_video_generator_desc: 'Create a video from a text prompt.',
+    video_generator_placeholder: 'e.g., "A neon hologram of a cat driving a sports car at top speed"',
     video_ready: 'Your Video is Ready!',
 
     // Ads AI Assistant
@@ -165,6 +168,8 @@ const translations = {
     password: 'كلمة المرور',
     login: 'تسجيل الدخول',
     login_with_google: 'تسجيل الدخول باستخدام جوجل',
+    login_to_account: 'سجل الدخول إلى حسابك',
+    or_continue_with: 'أو المتابعة باستخدام',
 
     // Dashboard
     welcome_back: 'مرحباً بعودتك',
@@ -240,7 +245,7 @@ const translations = {
     // Social Media Optimizer
     social_media_optimizer_name: 'محسن وسائل التواصل الاجتماعي',
     social_media_optimizer_desc: 'احصل على استراتيجيات نمو وأفكار محتوى لصناعتك.',
-    your_industry_label: 'صناعتك',
+    your_industry_label: 'مجال عملك',
     industry_placeholder: 'مثال: "التجارة الإلكترونية"',
     
     // Video Script Assistant
@@ -266,6 +271,7 @@ const translations = {
     // AI Video Generator
     ai_video_generator_name: 'مولد الفيديو بالذكاء الاصطناعي',
     ai_video_generator_desc: 'أنشئ مقطع فيديو من مطالبة نصية.',
+    video_generator_placeholder: 'مثال: "صورة ثلاثية الأبعاد نيون لقط يقود سيارة رياضية بأقصى سرعة"',
     video_ready: 'الفيديو الخاص بك جاهز!',
 
     // Ads AI Assistant

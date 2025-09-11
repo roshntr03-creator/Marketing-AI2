@@ -7,7 +7,8 @@ const Logo: React.FC<{ className?: string }> = ({ className = 'h-16 w-16' }) => 
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-label="Marketing AI Logo"
+      aria-label="Marketing AI Pro Logo"
+      role="img"
     >
       <defs>
         <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
@@ -15,7 +16,7 @@ const Logo: React.FC<{ className?: string }> = ({ className = 'h-16 w-16' }) => 
           <stop offset="100%" stopColor="#06b6d4" />
         </linearGradient>
       </defs>
-      {/* A stylized 'M' that also looks like a growth chart */}
+      {/* A stylized 'M' that also looks like a growth chart, symbolizing marketing growth. */}
       <path
         d="M4 18V6L12 14L20 6V18"
         stroke="url(#logoGradient)"
@@ -27,4 +28,4 @@ const Logo: React.FC<{ className?: string }> = ({ className = 'h-16 w-16' }) => 
   );
 };
 
-export default Logo;
+export default React.memo(Logo);

@@ -1,20 +1,20 @@
-
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { type Theme, type Language } from './types.ts';
 import { LanguageContext } from './hooks/useLocalization.ts';
 import { ThemeContext } from './hooks/useTheme.ts';
 import translations from './i18n/translations.ts';
-import LoginView from './views/LoginView.tsx';
-import DashboardView from './views/DashboardView.tsx';
-import ToolsView from './views/ToolsView.tsx';
-import AnalyticsView from './views/AnalyticsView.tsx';
-import SettingsView from './views/SettingsView.tsx';
 import BottomNavBar from './components/BottomNavBar.tsx';
 import LoadingSpinner from './components/LoadingSpinner.tsx';
 import { useAuth } from './hooks/useAuth.ts';
 import { auth } from './lib/firebaseClient.ts';
 import { ToastProvider } from './components/ToastProvider.tsx';
+
+// Lazy load views for better initial performance
+const LoginView = lazy(() => import('./views/LoginView.tsx'));
+const DashboardView = lazy(() => import('./views/DashboardView.tsx'));
+const ToolsView = lazy(() => import('./views/ToolsView.tsx'));
+const AnalyticsView = lazy(() => import('./views/AnalyticsView.tsx'));
+const SettingsView = lazy(() => import('./views/SettingsView.tsx'));
 
 type View = 'dashboard' | 'tools' | 'analytics' | 'settings';
 
@@ -42,6 +42,7 @@ const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.body.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('theme', theme);
   }, [theme]);
 
@@ -51,22 +52,12 @@ const App: React.FC = () => {
     localStorage.setItem('language', language);
   }, [language]);
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-  };
-  
-  const setLanguage = (newLang: Language) => {
-    setLanguageState(newLang);
-  };
+  const setTheme = (newTheme: Theme) => setThemeState(newTheme);
+  const setLanguage = (newLang: Language) => setLanguageState(newLang);
 
-  // FIX: Updated the `t` function to handle placeholder replacements.
   const t = useMemo(() => (key: string, replacements?: Record<string, string | number>): string => {
     const langKey = language as keyof typeof translations;
-    let translation = key;
-
-    if (translations[langKey] && (translations[langKey] as any)[key]) {
-      translation = (translations[langKey] as any)[key];
-    }
+    let translation = translations[langKey]?.[key as keyof typeof translations.en] || key;
     
     if (replacements) {
       Object.keys(replacements).forEach(rKey => {
@@ -77,19 +68,25 @@ const App: React.FC = () => {
     return translation;
   }, [language]);
 
-  const languageContextValue = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
-  const themeContextValue = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
+  const languageContextValue = useMemo(() => ({ language, setLanguage, t }), [language, t]);
+  const themeContextValue = useMemo(() => ({ theme, setTheme }), [theme]);
   
   const handleLogout = async () => {
-    await auth.signOut();
+    try {
+      await auth.signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
-
-  if (authLoading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+  
+  const FullScreenLoader: React.FC = () => (
+      <div className="h-screen w-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <LoadingSpinner />
       </div>
-    );
+  );
+
+  if (authLoading) {
+    return <FullScreenLoader />;
   }
 
   const renderView = () => {
@@ -111,16 +108,18 @@ const App: React.FC = () => {
     <ThemeContext.Provider value={themeContextValue}>
       <LanguageContext.Provider value={languageContextValue}>
         <ToastProvider>
-          {user ? (
-            <div className={`flex flex-col h-screen font-sans ${theme === 'dark' ? 'dark' : ''}`}>
-              <main className="flex-grow overflow-y-auto bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 pb-20">
-                {renderView()}
-              </main>
-              <BottomNavBar currentView={currentView} setCurrentView={setCurrentView} />
-            </div>
-          ) : (
-            <LoginView />
-          )}
+          <Suspense fallback={<FullScreenLoader />}>
+            {user ? (
+              <div className="flex flex-col h-screen font-sans">
+                <main className="flex-grow overflow-y-auto bg-gradient-animated text-gray-900 dark:text-gray-100 p-4 pb-20">
+                  {renderView()}
+                </main>
+                <BottomNavBar currentView={currentView} setCurrentView={setCurrentView} />
+              </div>
+            ) : (
+              <LoginView />
+            )}
+          </Suspense>
         </ToastProvider>
       </LanguageContext.Provider>
     </ThemeContext.Provider>

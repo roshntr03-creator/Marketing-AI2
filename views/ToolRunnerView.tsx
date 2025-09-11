@@ -15,16 +15,9 @@ interface ToolRunnerViewProps {
 const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
   const { t } = useLocalization();
   const {
-    inputs,
-    setInputValue,
-    imagePreview,
-    handleFileSelect,
-    handleClearImage,
-    handleSubmit,
-    isLoading,
-    error,
-    result,
-    retryStatus, // This now holds general loading status messages
+    inputs, setInputValue, imagePreview, handleFileSelect,
+    handleClearImage, handleSubmit, isLoading, error, result,
+    loadingStatus,
   } = useToolRunner(tool);
 
   const renderInput = (inputField: InputField) => {
@@ -37,7 +30,7 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
             value={(inputs[inputField.name] as string) || ''}
             onChange={(e) => setInputValue(inputField.name, e.target.value)}
             placeholder={t(inputField.placeholderKey)}
-            className="w-full p-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md h-32 focus:ring-cyan-500 focus:border-cyan-500"
+            className="w-full p-3 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md h-32 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
             rows={5}
           />
         );
@@ -60,15 +53,14 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
             value={(inputs[inputField.name] as string) || ''}
             onChange={(e) => setInputValue(inputField.name, e.target.value)}
             placeholder={t(inputField.placeholderKey)}
-            className="w-full p-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-cyan-500 focus:border-cyan-500"
+            className="w-full p-3 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
           />
         );
     }
   };
 
   const renderResult = () => {
-    if (typeof result === 'string') {
-      // Handle video URL result (now a blob URL)
+    if (typeof result === 'string') { // Handle video blob URL
       return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 animate-fade-in text-center">
           <h2 className="text-2xl font-bold mb-4 text-cyan-500 dark:text-cyan-400">{t('video_ready')}</h2>
@@ -84,10 +76,11 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center mb-6">
+      <header className="flex items-center mb-6">
         <button
           onClick={onBack}
-          className="text-gray-500 dark:text-gray-400 hover:text-cyan-500 dark:hover:text-cyan-400 p-2 rounded-full mr-2 rtl:mr-0 rtl:ml-2"
+          className="text-gray-500 dark:text-gray-400 hover:text-cyan-500 dark:hover:text-cyan-400 p-2 rounded-full mr-2 rtl:mr-0 rtl:ml-2 transition-colors"
+          aria-label="Back to tools list"
         >
           <i className="fa-solid fa-arrow-left rtl:fa-arrow-right text-xl"></i>
         </button>
@@ -95,10 +88,10 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
           <h1 className="text-2xl font-bold">{t(tool.nameKey)}</h1>
           <p className="text-gray-500 dark:text-gray-400">{t(tool.descriptionKey)}</p>
         </div>
-      </div>
+      </header>
 
-      {!result && (
-        <form onSubmit={handleSubmit} className="space-y-4">
+      {!result && !isLoading && (
+        <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in">
           {tool.inputs.map((inputField) => (
             <div key={inputField.name}>
               <label htmlFor={inputField.name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -110,22 +103,22 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full px-4 py-3 bg-cyan-500 text-white font-semibold rounded-md hover:bg-cyan-600 disabled:bg-cyan-300 disabled:cursor-not-allowed"
+            className="w-full px-4 py-3 bg-cyan-500 text-white font-semibold rounded-md hover:bg-cyan-600 disabled:bg-cyan-300 disabled:cursor-not-allowed transition-all transform hover:scale-105"
           >
-            {isLoading ? '...' : t('generate')}
+            {t('generate')}
           </button>
         </form>
       )}
 
       {isLoading && (
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center animate-fade-in">
           <LottieAnimation />
-          <p className="text-lg font-semibold">{retryStatus || t('generating_content')}</p>
+          <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{loadingStatus || t('generating_content')}</p>
           <SkeletonLoader />
         </div>
       )}
 
-      {error && <p className="mt-4 text-red-500 bg-red-100 dark:bg-red-900/50 p-3 rounded-md">{error}</p>}
+      {error && <p className="mt-4 text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 p-3 rounded-md animate-fade-in">{error}</p>}
 
       <div className="mt-8">{renderResult()}</div>
     </div>

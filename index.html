@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- Defaulting to Arabic, script will override if needed -->
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Marketing AI (التسويق بالذكاء الاصطناعي)</title>
+  <title>Marketing AI Pro | مساعد التسويق بالذكاء الاصطناعي</title>
   <meta name="description" content="An AI-powered marketing assistant for MENA businesses, offering tools for SEO, content creation, social media planning, and more, with full Arabic and English support.">
+  <meta name="theme-color" content="#06b6d4">
   
   <script type="importmap">
 {
@@ -28,16 +28,23 @@
 </script>
 
   <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192x192.png">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJsb2dvR3JhZGllbnQiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wQ29sb3I9IiMyMmQzZWUiIC8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wQ29sb3I9IiMwNmI2ZDQiIC8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHBhdGggZD0iTTQgMThWNkwxMiAxNEwyMCA2VjE4IiBzdHJva2U9InVybCgjbG9nb0dyYWRpZW50KSIgc3Ryb2tlV2lkdGg9IjIuNSIgc3Ryb2tlTGluZWNhcD0icm91bmQiIHN0cm9rZUxpbmVqb2luPSJyb3VuZCIgLz48L3N2Zz4=">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style type="text/tailwindcss">
+    @layer base {
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+    }
     @layer utilities {
       .animate-fade-in {
         animation: fadeIn 0.5s ease-in-out;
       }
       .animate-fade-in-up {
-        animation: fadeInUp 0.3s ease-out;
+        animation: fadeInUp 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000);
       }
       @keyframes fadeIn {
         from { opacity: 0; }
@@ -47,13 +54,28 @@
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
       }
+      .bg-gradient-animated {
+        background: linear-gradient(-45deg, #f0f9ff, #f0fdfa, #ecfeff, #f0f9ff);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
+      }
+      .dark .bg-gradient-animated {
+        background: linear-gradient(-45deg, #0c1422, #07191c, #091f24, #0c1422);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
+      }
+      @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
     }
   </style>
   <link rel="stylesheet" href="/index.css">
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 font-sans">
-  <noscript>You need to enable JavaScript to run this app.</noscript>
+<body class="font-sans text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-950">
+  <noscript>تحتاج إلى تمكين JavaScript لتشغيل هذا التطبيق.</noscript>
   <div id="root"></div>
   <script type="text/babel" data-type="module" src="/index.tsx"></script>
 </body>

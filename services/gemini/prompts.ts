@@ -1,10 +1,18 @@
 import { GenerateContentParameters } from '@google/genai';
 import { ImageInput } from './api.ts';
 
+/** A constant instruction appended to prompts that require a JSON response.
+ *  This greatly improves the reliability of receiving structured data from the model.
+ */
 const JSON_FORMAT_INSTRUCTION = `
-IMPORTANT: Your entire response must be a single, valid JSON object. Do not include any text, markdown, or code block syntax before or after the JSON. The JSON object must have a "title" property (a string) and a "sections" property (an array of objects). Each object in the "sections" array must have a "heading" property (a string) and a "content" property (a string, which can contain markdown or newlines).`;
+IMPORTANT: Your entire response must be a single, valid JSON object, without any markdown formatting like \`\`\`json. The JSON object must have a "title" property (string) and a "sections" property (an array of objects). Each object in the "sections" array must have a "heading" property (string) and a "content" property (string or an array of strings).`;
 
-// This is a simplified example. In a real application, these would be more complex and nuanced.
+/**
+ * Generates the appropriate prompt or content parts for a given tool and its inputs.
+ * @param toolId The unique identifier of the tool.
+ * @param inputs The user-provided data for the tool.
+ * @returns The prompt string or content object for the Gemini API.
+ */
 export const getPrompt = (
   toolId: string,
   inputs: Record<string, string | ImageInput>
@@ -38,10 +46,15 @@ export const getPrompt = (
     case 'customer_persona':
       return `Create a detailed customer persona based on this information. Product/Service: "${inputs.product_service}". Target Audience Details: "${inputs.target_audience_details}". The persona should include a name, demographics, goals, challenges, and motivations. Set the main title to the persona's name and create sections for "Demographics", "Goals", "Challenges", and "Motivations".${JSON_FORMAT_INSTRUCTION}`;
     default:
-      throw new Error(`Unknown tool ID: ${toolId}`);
+      throw new Error(`Unknown tool ID provided: ${toolId}`);
   }
 };
 
+/**
+ * Provides a system instruction to the AI model to set its persona for a specific task.
+ * @param toolId The unique identifier of the tool.
+ * @returns A string containing the system instruction.
+ */
 export const getSystemInstruction = (toolId: string): string => {
   switch (toolId) {
     case 'seo_assistant':

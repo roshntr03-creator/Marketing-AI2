@@ -1,1 +1,37 @@
-/* This file can be used for custom CSS overrides or additional styles. */
+/* index.css */
+
+/* Custom scrollbar for a cleaner, more modern look across the app */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #94a3b8; /* cool-gray-400 */
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #4b5563; /* cool-gray-600 */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #64748b; /* cool-gray-500 */
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: #374151; /* cool-gray-700 */
+}
+
+/* Custom focus ring for better accessibility and a branded feel */
+*:focus-visible {
+  outline: 2px solid #06b6d4; /* cyan-500 */
+  outline-offset: 2px;
+  border-radius: 6px;
+}

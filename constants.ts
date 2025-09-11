@@ -1,7 +1,11 @@
 import { type Tool } from './types.ts';
 
+/**
+ * Defines all the available marketing tools in the application.
+ * This centralized constant makes it easy to manage and extend the toolset.
+ */
 export const TOOLS: Tool[] = [
-  // Audience Growth & Strategy
+  // Category: Audience Growth & Strategy
   {
     id: 'seo_assistant',
     nameKey: 'seo_assistant_name',
@@ -33,7 +37,7 @@ export const TOOLS: Tool[] = [
       { name: 'field', type: 'text', labelKey: 'your_industry_label', placeholderKey: 'industry_placeholder' },
     ],
   },
-  // Creative Content Generation
+  // Category: Creative Content Generation
   {
     id: 'video_script_assistant',
     nameKey: 'video_script_assistant_name',
@@ -73,10 +77,10 @@ export const TOOLS: Tool[] = [
     icon: 'fa-solid fa-film',
     categoryKey: 'content_creation',
     inputs: [
-      { name: 'prompt', type: 'textarea', labelKey: 'video_idea_label', placeholderKey: 'video_idea_placeholder' },
+      { name: 'prompt', type: 'textarea', labelKey: 'video_idea_label', placeholderKey: 'video_generator_placeholder' },
     ],
   },
-  // Campaign & Outreach
+  // Category: Campaign & Outreach
   {
     id: 'ads_ai_assistant',
     nameKey: 'ads_ai_assistant_name',

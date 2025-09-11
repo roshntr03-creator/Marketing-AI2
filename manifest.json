@@ -1,18 +1,25 @@
+
 {
   "short_name": "Marketing AI",
-  "name": "Marketing AI (التسويق بالذكاء الاصطناعي)",
+  "name": "Marketing AI Pro (مساعد التسويق)",
   "description": "An AI-powered marketing assistant for MENA businesses, offering tools for SEO, content creation, social media planning, and more, with full Arabic and English support.",
   "icons": [
     {
-      "src": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJsb2dvR3JhZGllbnQiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wQ29sb3I9IiMyMmQzZWUiIC8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wQ29sb3I9IiMwNmI2ZDQiIC8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHBhdGggZD0iTTQgMThWNkwxMiAxNEwyMCA2VjE4IiBzdHJva2U9InVybCgjbG9nb0dyYWRpZW50KSIgc3Ryb2tlV2lkdGg9IjIuNSIgc3Ryb2tlTGluZWNhcD0icm91bmQiIHN0cm9rZUxpbmVqb2luPSJyb3VuZCIgLz48L3N2Zz4=",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "src": "/icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
   "scope": "/",
-  "theme_color": "#06b6d4",
-  "background_color": "#f3f4f6"
+  "theme_color": "#0891b2",
+  "background_color": "#f8fafc"
 }
