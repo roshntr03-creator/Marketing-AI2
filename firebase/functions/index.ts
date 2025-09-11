@@ -215,17 +215,20 @@ const getSystemInstruction = (toolId: string): string => {
 // ORIGINAL index.ts LOGIC - MIGRATED TO FUNCTIONS V2
 // =================================================================
 
-// FIX: Import Request and Response types and alias them to avoid conflicts with global DOM types.
-import { onCall, onRequest, HttpsError, Request as FunctionsRequest, Response as FunctionsResponse } from "firebase-functions/v2/https";
+// FIX: Import `Request` from `firebase-functions/v2/https` and `Response` from `express`.
+import { onCall, onRequest, HttpsError, Request as FunctionsRequest } from "firebase-functions/v2/https";
+import type { Response as FunctionsResponse } from "express";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
-import cors from "cors";
+// FIX: The `cors` package is no longer needed as we are using the built-in CORS handling for v2 functions.
+// import cors from "cors";
 import { GoogleGenAI, GenerateContentResponse, GenerateVideosOperation } from '@google/genai';
 
 admin.initializeApp();
 setGlobalOptions({ region: "us-central1" });
 
-const corsHandler = cors({origin: true});
+// FIX: Removed manual cors handler. The built-in `cors: true` option on `onRequest` is used instead.
+// const corsHandler = cors({origin: true});
 
 // The API_KEY is now managed by Firebase Secret Manager and automatically
 // populated into process.env.
@@ -315,77 +318,77 @@ export const generateContent = onCall({ secrets: ["API_KEY"] }, async (request) 
 });
 
 
-// FIX: Explicitly type `req` and `res` to ensure the correct Firebase Functions types are used.
-export const generateVideo = onRequest({ timeoutSeconds: 540, memory: "1GiB", secrets: ["API_KEY"] }, (req: FunctionsRequest, res: FunctionsResponse) => {
-    corsHandler(req, res, async () => {
-        if (req.method !== 'POST') {
-            res.status(405).send('Method Not Allowed');
-            return;
+// FIX: Switched to idiomatic v2 CORS handling by adding `cors: true` to the options.
+// This removes the manual `cors` package usage and resolves the associated type conflicts
+// with `Request` and `Response` objects that caused the original errors.
+export const generateVideo = onRequest({ timeoutSeconds: 540, memory: "1GiB", secrets: ["API_KEY"], cors: true }, async (req: FunctionsRequest, res: FunctionsResponse) => {
+    if (req.method !== 'POST') {
+        res.status(405).send('Method Not Allowed');
+        return;
+    }
+
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) {
+        res.status(401).send('Unauthorized: No token provided.');
+        return;
+    }
+
+    try {
+        await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+        res.status(401).send('Unauthorized: Invalid token.');
+        return;
+    }
+
+    const { prompt } = req.body;
+    if (!prompt || typeof prompt !== 'string') {
+        res.status(400).send('Bad Request: Missing or invalid prompt.');
+        return;
+    }
+
+    try {
+        let operation = await callVideoGeneratorBackend(prompt);
+
+        while (!operation.done) {
+            await new Promise(resolve => setTimeout(resolve, 10000)); // wait 10s
+            operation = await checkVideoOperationBackend(operation);
         }
 
-        const idToken = req.headers.authorization?.split('Bearer ')[1];
-        if (!idToken) {
-            res.status(401).send('Unauthorized: No token provided.');
-            return;
+        if (operation.error) {
+            throw new Error(String(operation.error.message || 'Video generation failed with an unknown error.'));
+        }
+        
+        const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+        if (!videoUri) {
+            throw new Error("Video generation completed but no URI was found.");
+        }
+        
+        const downloadableUrl = `${videoUri}&key=${process.env.API_KEY}`;
+        
+        const videoResponse = await fetch(downloadableUrl);
+
+        if (!videoResponse.ok) {
+            throw new Error(`Failed to fetch video file: ${videoResponse.statusText}`);
         }
 
-        try {
-            await admin.auth().verifyIdToken(idToken);
-        } catch (error) {
-            res.status(401).send('Unauthorized: Invalid token.');
-            return;
+        if (!videoResponse.body) {
+            throw new Error("Video response body is null.");
         }
-
-        const { prompt } = req.body;
-        if (!prompt || typeof prompt !== 'string') {
-            res.status(400).send('Bad Request: Missing or invalid prompt.');
-            return;
+        
+        res.setHeader('Content-Type', 'video/mp4');
+        
+        const reader = videoResponse.body.getReader();
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+            res.write(value);
         }
+        res.end();
 
-        try {
-            let operation = await callVideoGeneratorBackend(prompt);
-
-            while (!operation.done) {
-                await new Promise(resolve => setTimeout(resolve, 10000)); // wait 10s
-                operation = await checkVideoOperationBackend(operation);
-            }
-
-            if (operation.error) {
-                throw new Error(String(operation.error.message || 'Video generation failed with an unknown error.'));
-            }
-            
-            const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-            if (!videoUri) {
-                throw new Error("Video generation completed but no URI was found.");
-            }
-            
-            const downloadableUrl = `${videoUri}&key=${process.env.API_KEY}`;
-            
-            const videoResponse = await fetch(downloadableUrl);
-
-            if (!videoResponse.ok) {
-                throw new Error(`Failed to fetch video file: ${videoResponse.statusText}`);
-            }
-
-            if (!videoResponse.body) {
-                throw new Error("Video response body is null.");
-            }
-            
-            res.setHeader('Content-Type', 'video/mp4');
-            
-            const reader = videoResponse.body.getReader();
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    break;
-                }
-                res.write(value);
-            }
-            res.end();
-
-        } catch (error: any) {
-            console.error("Error during video generation:", error);
-            res.status(500).send(`Internal Server Error: ${error.message}`);
-        }
-    });
+    } catch (error: any) {
+        console.error("Error during video generation:", error);
+        res.status(500).send(`Internal Server Error: ${error.message}`);
+    }
 });
