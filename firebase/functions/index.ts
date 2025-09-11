@@ -212,32 +212,29 @@ const getSystemInstruction = (toolId: string): string => {
 // --- End of inlined services/gemini/prompts.ts ---
 
 // =================================================================
-// ORIGINAL index.ts LOGIC
+// ORIGINAL index.ts LOGIC - MIGRATED TO FUNCTIONS V2
 // =================================================================
 
-import * as functions from "firebase-functions/v1";
+// FIX: Import Request and Response types and alias them to avoid conflicts with global DOM types.
+import { onCall, onRequest, HttpsError, Request as FunctionsRequest, Response as FunctionsResponse } from "firebase-functions/v2/https";
+import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
-import cors from "cors"; // FIX: Changed import from 'import * as cors' to 'import cors'
+import cors from "cors";
 import { GoogleGenAI, GenerateContentResponse, GenerateVideosOperation } from '@google/genai';
 
 admin.initializeApp();
+setGlobalOptions({ region: "us-central1" });
 
-const regionalFunctions = functions.region("us-central1");
 const corsHandler = cors({origin: true});
 
+// The API_KEY is now managed by Firebase Secret Manager and automatically
+// populated into process.env.
 if (!process.env.API_KEY) {
-    try {
-        process.env.API_KEY = functions.config().gemini.key;
-    } catch(e) {
-        console.error("Failed to get gemini.key from firebase config");
-    }
-}
-if (!process.env.API_KEY) {
-    console.error("Gemini API Key is not set in environment variables or Firebase config.");
+    console.error("API_KEY not set in function environment. Please set the secret using `firebase functions:secrets:set API_KEY`");
     throw new Error("API_KEY not configured.");
 }
-
 const genAI = new GoogleGenAI({apiKey: process.env.API_KEY!});
+
 
 interface ApiImageInput {
   base64: string;
@@ -286,17 +283,17 @@ const checkVideoOperationBackend = async (operation: GenerateVideosOperation): P
     return updatedOperation;
 }
 
-export const generateContent = regionalFunctions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+export const generateContent = onCall({ secrets: ["API_KEY"] }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
-    const { toolId, inputs } = data;
+    const { toolId, inputs } = request.data;
     if (!toolId || !inputs) {
-        throw new functions.https.HttpsError("invalid-argument", "Missing 'toolId' or 'inputs'.");
+        throw new HttpsError("invalid-argument", "Missing 'toolId' or 'inputs'.");
     }
     const tool = TOOLS.find(t => t.id === toolId);
     if (!tool) {
-        throw new functions.https.HttpsError("not-found", `Tool with id ${toolId} not found.`);
+        throw new HttpsError("not-found", `Tool with id ${toolId} not found.`);
     }
 
     try {
@@ -313,85 +310,82 @@ export const generateContent = regionalFunctions.https.onCall(async (data, conte
         }
     } catch (error: any) {
         console.error("Error calling Gemini API:", JSON.stringify(error));
-        throw new functions.https.HttpsError("internal", "An error occurred with the AI model.", error.message);
+        throw new HttpsError("internal", "An error occurred with the AI model.", error.message);
     }
 });
 
 
-export const generateVideo = regionalFunctions
-    .runWith({ timeoutSeconds: 540, memory: "1GB" })
-    // FIX: Use 'any' for req and res types to resolve compilation errors caused by incorrect type inference.
-    // The previous types were incorrect for an onRequest function.
-    .https.onRequest((req: any, res: any) => {
-        corsHandler(req, res, async () => {
-            if (req.method !== 'POST') {
-                res.status(405).send('Method Not Allowed');
-                return;
+// FIX: Explicitly type `req` and `res` to ensure the correct Firebase Functions types are used.
+export const generateVideo = onRequest({ timeoutSeconds: 540, memory: "1GiB", secrets: ["API_KEY"] }, (req: FunctionsRequest, res: FunctionsResponse) => {
+    corsHandler(req, res, async () => {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+
+        const idToken = req.headers.authorization?.split('Bearer ')[1];
+        if (!idToken) {
+            res.status(401).send('Unauthorized: No token provided.');
+            return;
+        }
+
+        try {
+            await admin.auth().verifyIdToken(idToken);
+        } catch (error) {
+            res.status(401).send('Unauthorized: Invalid token.');
+            return;
+        }
+
+        const { prompt } = req.body;
+        if (!prompt || typeof prompt !== 'string') {
+            res.status(400).send('Bad Request: Missing or invalid prompt.');
+            return;
+        }
+
+        try {
+            let operation = await callVideoGeneratorBackend(prompt);
+
+            while (!operation.done) {
+                await new Promise(resolve => setTimeout(resolve, 10000)); // wait 10s
+                operation = await checkVideoOperationBackend(operation);
             }
 
-            const idToken = req.headers.authorization?.split('Bearer ')[1];
-            if (!idToken) {
-                res.status(401).send('Unauthorized: No token provided.');
-                return;
+            if (operation.error) {
+                throw new Error(String(operation.error.message || 'Video generation failed with an unknown error.'));
+            }
+            
+            const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+            if (!videoUri) {
+                throw new Error("Video generation completed but no URI was found.");
+            }
+            
+            const downloadableUrl = `${videoUri}&key=${process.env.API_KEY}`;
+            
+            const videoResponse = await fetch(downloadableUrl);
+
+            if (!videoResponse.ok) {
+                throw new Error(`Failed to fetch video file: ${videoResponse.statusText}`);
             }
 
-            try {
-                await admin.auth().verifyIdToken(idToken);
-            } catch (error) {
-                res.status(401).send('Unauthorized: Invalid token.');
-                return;
+            if (!videoResponse.body) {
+                throw new Error("Video response body is null.");
             }
-
-            const { prompt } = req.body;
-            if (!prompt || typeof prompt !== 'string') {
-                res.status(400).send('Bad Request: Missing or invalid prompt.');
-                return;
+            
+            res.setHeader('Content-Type', 'video/mp4');
+            
+            const reader = videoResponse.body.getReader();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+                res.write(value);
             }
+            res.end();
 
-            try {
-                let operation = await callVideoGeneratorBackend(prompt);
-
-                while (!operation.done) {
-                    await new Promise(resolve => setTimeout(resolve, 10000)); // wait 10s
-                    operation = await checkVideoOperationBackend(operation);
-                }
-
-                if (operation.error) {
-                    throw new Error(String(operation.error.message || 'Video generation failed with an unknown error.'));
-                }
-                
-                const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-                if (!videoUri) {
-                    throw new Error("Video generation completed but no URI was found.");
-                }
-                
-                const downloadableUrl = `${videoUri}&key=${process.env.API_KEY}`;
-                
-                const videoResponse = await fetch(downloadableUrl);
-
-                if (!videoResponse.ok) {
-                    throw new Error(`Failed to fetch video file: ${videoResponse.statusText}`);
-                }
-
-                if (!videoResponse.body) {
-                    throw new Error("Video response body is null.");
-                }
-                
-                res.setHeader('Content-Type', 'video/mp4');
-                
-                const reader = videoResponse.body.getReader();
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) {
-                        break;
-                    }
-                    res.write(value);
-                }
-                res.end();
-
-            } catch (error: any) {
-                console.error("Error during video generation:", error);
-                res.status(500).send(`Internal Server Error: ${error.message}`);
-            }
-        });
+        } catch (error: any) {
+            console.error("Error during video generation:", error);
+            res.status(500).send(`Internal Server Error: ${error.message}`);
+        }
     });
+});
