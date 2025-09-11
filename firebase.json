@@ -7,14 +7,15 @@
     ]
   },
   "hosting": {
-    "public": "public",
+    "public": ".",
     "ignore": [
       "firebase.json",
       ".firebaserc",
       "firebase/**",
       "*.md",
       "*.log",
-      "node_modules/**"
+      "node_modules/**",
+      "public/**"
     ],
     "headers": [
       {
