@@ -8,6 +8,7 @@ import LoadingSpinner from './components/LoadingSpinner.tsx';
 import { useAuth } from './hooks/useAuth.ts';
 import { auth } from './lib/firebaseClient.ts';
 import { ToastProvider } from './components/ToastProvider.tsx';
+import { signOut } from 'firebase/auth';
 
 // Lazy load views for better initial performance
 const LoginView = lazy(() => import('./views/LoginView.tsx'));
@@ -73,7 +74,7 @@ const App: React.FC = () => {
   
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await signOut(auth);
     } catch (error) {
       console.error("Error signing out:", error);
     }

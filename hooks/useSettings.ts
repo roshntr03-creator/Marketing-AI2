@@ -3,6 +3,7 @@ import { type User } from '../types.ts';
 import { auth } from '../lib/firebaseClient.ts';
 import { useToasts } from './useToasts.ts';
 import { useLocalization } from './useLocalization.ts';
+import { updateProfile, updatePassword } from 'firebase/auth';
 
 export const useSettings = (user: User | null) => {
   const { addToast } = useToasts();
@@ -26,7 +27,7 @@ export const useSettings = (user: User | null) => {
 
     setLoadingProfile(true);
     try {
-      await auth.currentUser.updateProfile({ displayName: fullName });
+      await updateProfile(auth.currentUser, { displayName: fullName });
       addToast(t('profile_saved_success'), 'success');
     } catch (error) {
       addToast(t('profile_update_error'), 'error');
@@ -45,7 +46,7 @@ export const useSettings = (user: User | null) => {
 
     setLoadingPassword(true);
     try {
-      await auth.currentUser.updatePassword(password);
+      await updatePassword(auth.currentUser, password);
       addToast(t('password_changed_success'), 'success');
       setPassword('');
       setConfirmPassword('');

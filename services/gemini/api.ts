@@ -1,5 +1,4 @@
-import { functions, auth } from '../../lib/firebaseClient.ts';
-import { firebaseConfig } from '../../lib/firebaseClient.ts';
+import { functions, auth, httpsCallable, firebaseConfig } from '../../lib/firebaseClient.ts';
 import { GeneratedContentData } from '../../types';
 
 /** Type definition for image data sent to the backend. */
@@ -8,8 +7,7 @@ export interface ImageInput {
     mimeType: string;
 }
 
-// FIX: Use httpsCallable from the v8 compat 'functions' instance, not from the v9 'firebase/functions' module.
-const generateContentFunction = functions.httpsCallable('generateContent');
+const generateContentFunction = httpsCallable(functions, 'generateContent');
 
 /**
  * Converts a File object to a base64 encoded string.
