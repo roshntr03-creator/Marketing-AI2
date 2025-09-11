@@ -1,19 +1,12 @@
-
 {
   "short_name": "Marketing AI",
   "name": "Marketing AI Pro (مساعد التسويق)",
   "description": "An AI-powered marketing assistant for MENA businesses, offering tools for SEO, content creation, social media planning, and more, with full Arabic and English support.",
   "icons": [
     {
-      "src": "/icon-192x192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512x512.png",
-      "type": "image/png",
-      "sizes": "512x512",
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
       "purpose": "any maskable"
     }
   ],
