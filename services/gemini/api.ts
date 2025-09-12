@@ -8,6 +8,8 @@ export interface ImageInput {
 }
 
 const generateContentFunction = httpsCallable(functions, 'generateContent');
+const generateImageFunction = httpsCallable(functions, 'generateImage');
+
 
 /**
  * Converts a File object to a base64 encoded string.
@@ -90,4 +92,22 @@ export const generateVideoApi = async (prompt: string): Promise<string> => {
     
     // Create a local URL for the video blob to be used in the <video> tag.
     return URL.createObjectURL(blob);
+};
+
+/**
+ * Calls the `generateImage` Firebase Function.
+ * @param prompt The text prompt for image generation.
+ * @returns A promise that resolves with a base64 encoded string of the generated PNG image.
+ * @throws An error if authentication fails or the server returns an error.
+ */
+export const generateImageApi = async (prompt: string): Promise<string> => {
+    if (!prompt) {
+        throw new Error("Prompt cannot be empty for image generation.");
+    }
+    const response = await generateImageFunction({ prompt });
+    const data = response.data as { base64Image: string };
+    if (!data.base64Image) {
+        throw new Error("The AI did not return an image. Please try a different prompt.");
+    }
+    return data.base64Image;
 };

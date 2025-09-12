@@ -80,6 +80,16 @@ export const TOOLS: Tool[] = [
       { name: 'prompt', type: 'textarea', labelKey: 'video_idea_label', placeholderKey: 'video_generator_placeholder' },
     ],
   },
+  {
+    id: 'ai_image_generator',
+    nameKey: 'ai_image_generator_name',
+    descriptionKey: 'ai_image_generator_desc',
+    icon: 'fa-solid fa-image',
+    categoryKey: 'content_creation',
+    inputs: [
+      { name: 'prompt', type: 'textarea', labelKey: 'image_prompt_label', placeholderKey: 'image_prompt_placeholder' },
+    ],
+  },
   // Category: Campaign & Outreach
   {
     id: 'ads_ai_assistant',

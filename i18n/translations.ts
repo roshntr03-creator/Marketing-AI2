@@ -126,6 +126,14 @@ const translations = {
     ai_video_generator_desc: 'Create a video from a text prompt.',
     video_generator_placeholder: 'e.g., "A neon hologram of a cat driving a sports car at top speed"',
     video_ready: 'Your Video is Ready!',
+    
+    // AI Image Generator
+    ai_image_generator_name: 'AI Image Generator',
+    ai_image_generator_desc: 'Create stunning visuals for ads and social media.',
+    image_prompt_label: 'Image Prompt',
+    image_prompt_placeholder: 'e.g., A photorealistic image of a futuristic perfume bottle on a black silk cloth',
+    image_ready: 'Your Image is Ready!',
+    download_image: 'Download Image',
 
     // Ads AI Assistant
     ads_ai_assistant_name: 'Ads AI Assistant',
@@ -273,6 +281,14 @@ const translations = {
     ai_video_generator_desc: 'أنشئ مقطع فيديو من مطالبة نصية.',
     video_generator_placeholder: 'مثال: "صورة ثلاثية الأبعاد نيون لقط يقود سيارة رياضية بأقصى سرعة"',
     video_ready: 'الفيديو الخاص بك جاهز!',
+
+    // AI Image Generator
+    ai_image_generator_name: 'مولد الصور بالذكاء الاصطناعي',
+    ai_image_generator_desc: 'أنشئ صورًا مذهلة للإعلانات ووسائل التواصل الاجتماعي.',
+    image_prompt_label: 'وصف الصورة',
+    image_prompt_placeholder: 'مثال: صورة واقعية لزجاجة عطر مستقبلية على قطعة قماش حريرية سوداء',
+    image_ready: 'صورتك جاهزة!',
+    download_image: 'تحميل الصورة',
 
     // Ads AI Assistant
     ads_ai_assistant_name: 'مساعد إعلانات الذكاء الاصطناعي',

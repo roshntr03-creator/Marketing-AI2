@@ -60,7 +60,16 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
   };
 
   const renderResult = () => {
-    if (typeof result === 'string') { // Handle video blob URL
+    const handleDownload = (dataUrl: string, filename: string) => {
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    if (tool.id === 'video_generator' && typeof result === 'string' && result.startsWith('blob:')) {
       return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 animate-fade-in text-center">
           <h2 className="text-2xl font-bold mb-4 text-cyan-500 dark:text-cyan-400">{t('video_ready')}</h2>
@@ -68,9 +77,28 @@ const ToolRunnerView: React.FC<ToolRunnerViewProps> = ({ tool, onBack }) => {
         </div>
       );
     }
-    if (result) {
+
+    if (tool.id === 'ai_image_generator' && typeof result === 'string') {
+        const imageUrl = `data:image/png;base64,${result}`;
+        return (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 animate-fade-in text-center">
+                <h2 className="text-2xl font-bold mb-4 text-cyan-500 dark:text-cyan-400">{t('image_ready')}</h2>
+                <img src={imageUrl} alt={t('ai_image_generator_name')} className="w-full max-w-md mx-auto rounded-lg shadow-lg" />
+                <button
+                    onClick={() => handleDownload(imageUrl, 'ai-generated-image.png')}
+                    className="mt-6 px-4 py-2 bg-green-500 text-white font-semibold rounded-md hover:bg-green-600 disabled:bg-green-300 transition-colors flex items-center justify-center mx-auto"
+                >
+                    <i className="fa-solid fa-download mr-2"></i>
+                    {t('download_image')}
+                </button>
+            </div>
+        );
+    }
+
+    if (result && typeof result !== 'string') {
       return <GeneratedContent data={result as GeneratedContentData} />;
     }
+    
     return null;
   };
 

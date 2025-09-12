@@ -5,7 +5,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToasts } from './useToasts.ts';
 import { useLocalization } from './useLocalization.ts';
 import { processJsonResponse, processGroundedResponse } from '../services/gemini/parser.ts';
-import { callGenerateContentApi, generateVideoApi } from '../services/gemini/api.ts';
+import { callGenerateContentApi, generateVideoApi, generateImageApi } from '../services/gemini/api.ts';
 
 type Inputs = Record<string, string | File>;
 
@@ -51,8 +51,9 @@ export const useToolRunner = (tool: Tool) => {
     const user = auth.currentUser;
     if (!user) return;
 
-    // For video generation, we save the prompt instead of the temporary blob URL.
-    const outputToStore = tool.id === 'video_generator' ? (inputs.prompt as string) : generationResult;
+    // For video/image generation, we save the prompt instead of the temporary blob URL or base64 string.
+    const isMediaGeneration = tool.id === 'video_generator' || tool.id === 'ai_image_generator';
+    const outputToStore = isMediaGeneration ? (inputs.prompt as string) : generationResult;
 
     // Remove file objects from inputs before saving to Firestore, as it only accepts strings.
     const storableInputs = Object.entries(inputs).reduce((acc, [key, value]) => {
@@ -91,6 +92,12 @@ export const useToolRunner = (tool: Tool) => {
         const videoUrl = await generateVideoApi(prompt);
         setResult(videoUrl);
         await saveToHistory(videoUrl);
+      } else if (tool.id === 'ai_image_generator') {
+        const prompt = inputs.prompt as string;
+        if (!prompt) throw new Error("Image prompt cannot be empty.");
+        const base64Image = await generateImageApi(prompt);
+        setResult(base64Image);
+        await saveToHistory(base64Image);
       } else {
         const data = await callGenerateContentApi(tool.id, inputs);
         

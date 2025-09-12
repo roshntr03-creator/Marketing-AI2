@@ -55,14 +55,15 @@ const AnalyticsView: React.FC = () => {
   const renderModalContent = () => {
       if (!selectedGeneration) return null;
       
-      if (selectedTool?.id === 'video_generator' && typeof selectedGeneration.output === 'string') {
+      if ((selectedTool?.id === 'video_generator' || selectedTool?.id === 'ai_image_generator') && typeof selectedGeneration.output === 'string') {
+          const title = selectedTool.id === 'video_generator' ? "Video Generation Prompt" : "Image Generation Prompt";
           return (
               <div>
-                  <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Video Generation Prompt</h3>
+                  <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">{title}</h3>
                   <p className="whitespace-pre-wrap bg-gray-100 dark:bg-gray-700 p-3 rounded-md font-mono text-sm">
                     {selectedGeneration.output}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">Note: The actual video file is not stored in your history.</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">Note: The actual media file is not stored in your history.</p>
               </div>
           );
       }
