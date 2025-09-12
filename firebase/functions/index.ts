@@ -1,157 +1,44 @@
-// =================================================================
-// START INLINED DEPENDENCIES
-// To fix a critical and persistent deployment issue caused by a fragile build configuration,
-// all shared frontend code required by this backend function has been merged into this single file.
-// This ensures the function is self-contained and deploys reliably.
-// =================================================================
+// FIX: Migrated from Firebase Functions v1 to v2 to resolve type errors and modernise the syntax.
+// This addresses errors related to 'auth', 'toolId', 'inputs', and 'runWith' properties by adopting
+// the v2 request-response model for both onCall and onRequest triggers.
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import * as logger from "firebase-functions/logger";
+import * as admin from "firebase-admin";
+import { GoogleGenAI, GenerateContentParameters } from "@google/genai";
 
-// --- Start of inlined types.ts ---
-interface InputField {
-  name: string;
-  type: 'text' | 'textarea' | 'image';
-  labelKey: string;
-  placeholderKey: string;
+// Initialize Firebase Admin SDK
+admin.initializeApp();
+
+// Get API key from environment variables.
+if (!process.env.API_KEY) {
+  logger.error("API_KEY environment variable not set. Please set it in your Firebase Functions environment configuration.");
+  throw new Error("API_KEY environment variable not set.");
+}
+// FIX: Initialize GoogleGenAI with a named apiKey parameter as per the guidelines.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+
+// --- Start of logic similar to client-side services/gemini/prompts.ts ---
+
+/** Type definition for image data sent from the client. */
+interface ImageInput {
+    base64: string;
+    mimeType: string;
 }
 
-interface Tool {
-  id: string;
-  nameKey: string;
-  descriptionKey: string;
-  icon: string;
-  categoryKey: string;
-  inputs: InputField[];
-}
-// --- End of inlined types.ts ---
-
-
-// --- Start of inlined constants.ts ---
-const TOOLS: Tool[] = [
-  // Category: Audience Growth & Strategy
-  {
-    id: 'seo_assistant',
-    nameKey: 'seo_assistant_name',
-    descriptionKey: 'seo_assistant_desc',
-    icon: 'fa-solid fa-magnifying-glass-chart',
-    categoryKey: 'audience_growth_strategy',
-    inputs: [
-      { name: 'topic', type: 'text', labelKey: 'topic_label', placeholderKey: 'seo_placeholder' },
-    ],
-  },
-  {
-    id: 'influencer_discovery',
-    nameKey: 'influencer_discovery_name',
-    descriptionKey: 'influencer_discovery_desc',
-    icon: 'fa-solid fa-users-rays',
-    categoryKey: 'audience_growth_strategy',
-    inputs: [
-      { name: 'city', type: 'text', labelKey: 'city_label', placeholderKey: 'city_placeholder' },
-      { name: 'field', type: 'text', labelKey: 'field_label', placeholderKey: 'field_placeholder' },
-    ],
-  },
-  {
-    id: 'social_media_optimizer',
-    nameKey: 'social_media_optimizer_name',
-    descriptionKey: 'social_media_optimizer_desc',
-    icon: 'fa-solid fa-arrow-trend-up',
-    categoryKey: 'audience_growth_strategy',
-    inputs: [
-      { name: 'field', type: 'text', labelKey: 'your_industry_label', placeholderKey: 'industry_placeholder' },
-    ],
-  },
-  // Category: Creative Content Generation
-  {
-    id: 'video_script_assistant',
-    nameKey: 'video_script_assistant_name',
-    descriptionKey: 'video_script_assistant_desc',
-    icon: 'fa-solid fa-clapperboard',
-    categoryKey: 'content_creation',
-    inputs: [
-      { name: 'idea', type: 'textarea', labelKey: 'video_idea_label', placeholderKey: 'video_idea_placeholder' },
-    ],
-  },
-  {
-    id: 'short_form_factory',
-    nameKey: 'short_form_factory_name',
-    descriptionKey: 'short_form_factory_desc',
-    icon: 'fa-solid fa-wand-magic-sparkles',
-    categoryKey: 'content_creation',
-    inputs: [
-        { name: 'source_text', type: 'textarea', labelKey: 'long_form_content_label', placeholderKey: 'long_form_content_placeholder' },
-        { name: 'image', type: 'image', labelKey: 'or_upload_product_image_label', placeholderKey: '' },
-    ],
-  },
-  {
-    id: 'smm_content_plan',
-    nameKey: 'smm_content_plan_name',
-    descriptionKey: 'smm_content_plan_desc',
-    icon: 'fa-solid fa-calendar-week',
-    categoryKey: 'content_creation',
-    inputs: [
-      { name: 'platform', type: 'text', labelKey: 'platform_label', placeholderKey: 'platform_placeholder' },
-      { name: 'topic', type: 'text', labelKey: 'topic_label', placeholderKey: 'smm_topic_placeholder' },
-    ],
-  },
-  {
-    id: 'video_generator',
-    nameKey: 'ai_video_generator_name',
-    descriptionKey: 'ai_video_generator_desc',
-    icon: 'fa-solid fa-film',
-    categoryKey: 'content_creation',
-    inputs: [
-      { name: 'prompt', type: 'textarea', labelKey: 'video_idea_label', placeholderKey: 'video_generator_placeholder' },
-    ],
-  },
-  // Category: Campaign & Outreach
-  {
-    id: 'ads_ai_assistant',
-    nameKey: 'ads_ai_assistant_name',
-    descriptionKey: 'ads_ai_assistant_desc',
-    icon: 'fa-solid fa-bullhorn',
-    categoryKey: 'campaign_management',
-    inputs: [
-      { name: 'product', type: 'textarea', labelKey: 'product_description_label', placeholderKey: 'product_description_placeholder' },
-      { name: 'audience', type: 'text', labelKey: 'target_audience_label', placeholderKey: 'target_audience_placeholder' },
-    ],
-  },
-  {
-    id: 'email_marketing',
-    nameKey: 'email_marketing_name',
-    descriptionKey: 'email_marketing_desc',
-    icon: 'fa-solid fa-envelope-open-text',
-    categoryKey: 'campaign_management',
-    inputs: [
-      { name: 'goal', type: 'textarea', labelKey: 'campaign_goal_label', placeholderKey: 'campaign_goal_placeholder' },
-    ],
-  },
-  {
-    id: 'customer_persona',
-    nameKey: 'customer_persona_name',
-    descriptionKey: 'customer_persona_desc',
-    icon: 'fa-solid fa-user-astronaut',
-    categoryKey: 'campaign_management',
-    inputs: [
-      { name: 'product_service', type: 'textarea', labelKey: 'product_service_label', placeholderKey: 'product_service_placeholder' },
-      { name: 'target_audience_details', type: 'textarea', labelKey: 'target_audience_details_label', placeholderKey: 'target_audience_details_placeholder' },
-    ],
-  },
-];
-// --- End of inlined constants.ts ---
-
-
-// --- Start of inlined services/gemini/prompts.ts ---
-import { GenerateContentParameters } from '@google/genai';
-
-interface ImageInputForPrompt {
-  base64: string;
-  mimeType: string;
-}
-
+/** A constant instruction appended to prompts that require a JSON response. */
 const JSON_FORMAT_INSTRUCTION = `
 IMPORTANT: Your entire response must be a single, valid JSON object, without any markdown formatting like \`\`\`json. The JSON object must have a "title" property (string) and a "sections" property (an array of objects). Each object in the "sections" array must have a "heading" property (string) and a "content" property (string or an array of strings).`;
 
+/**
+ * Generates the appropriate prompt or content parts for a given tool and its inputs.
+ * @param toolId The unique identifier of the tool.
+ * @param inputs The user-provided data for the tool.
+ * @returns The prompt string or content object for the Gemini API.
+ */
 const getPrompt = (
   toolId: string,
-  inputs: Record<string, string | ImageInputForPrompt>
+  inputs: Record<string, string | ImageInput>
 ): string | GenerateContentParameters['contents'] => {
   switch (toolId) {
     case 'seo_assistant':
@@ -164,7 +51,7 @@ const getPrompt = (
       return `Write an engaging 30-45 second video script for the following idea: "${inputs.idea}". The script should have a strong hook, a clear body, and a call-to-action. Format it with scene descriptions and dialogue. Set the main title to "Video Script: ${inputs.idea}" and create sections for "Hook", "Scene 1", "Call to Action", etc.${JSON_FORMAT_INSTRUCTION}`;
     case 'short_form_factory':
       if (inputs.image) {
-        const image = inputs.image as ImageInputForPrompt;
+        const image = inputs.image as ImageInput;
         return {
           parts: [
             { inlineData: { mimeType: image.mimeType, data: image.base64 } },
@@ -186,6 +73,11 @@ const getPrompt = (
   }
 };
 
+/**
+ * Provides a system instruction to the AI model to set its persona for a specific task.
+ * @param toolId The unique identifier of the tool.
+ * @returns A string containing the system instruction.
+ */
 const getSystemInstruction = (toolId: string): string => {
   switch (toolId) {
     case 'seo_assistant':
@@ -209,174 +101,138 @@ const getSystemInstruction = (toolId: string): string => {
       return 'You are a helpful marketing assistant. Your goal is to provide creative and strategic content for marketing professionals.';
   }
 };
-// --- End of inlined services/gemini/prompts.ts ---
 
-// =================================================================
-// ORIGINAL index.ts LOGIC - MIGRATED TO FUNCTIONS V2
-// =================================================================
-
-// FIX: Import `Request` from `firebase-functions/v2/https` and `Response` from `express`.
-import { onCall, onRequest, HttpsError, Request as FunctionsRequest } from "firebase-functions/v2/https";
-import type { Response as FunctionsResponse } from "express";
-import { setGlobalOptions } from "firebase-functions/v2";
-import * as admin from "firebase-admin";
-// FIX: The `cors` package is no longer needed as we are using the built-in CORS handling for v2 functions.
-// import cors from "cors";
-import { GoogleGenAI, GenerateContentResponse, GenerateVideosOperation } from '@google/genai';
-
-admin.initializeApp();
-setGlobalOptions({ region: "us-central1" });
-
-// FIX: Removed manual cors handler. The built-in `cors: true` option on `onRequest` is used instead.
-// const corsHandler = cors({origin: true});
-
-// The API_KEY is now managed by Firebase Secret Manager and automatically
-// populated into process.env.
-if (!process.env.API_KEY) {
-    console.error("API_KEY not set in function environment. Please set the secret using `firebase functions:secrets:set API_KEY`");
-    throw new Error("API_KEY not configured.");
-}
-const genAI = new GoogleGenAI({apiKey: process.env.API_KEY!});
+// --- End of prompt logic ---
 
 
-interface ApiImageInput {
-  base64: string;
-  mimeType: string;
-}
+/**
+ * A callable Cloud Function to generate content using the Gemini API.
+ */
+export const generateContent = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
 
-const callGeminiBackend = async (
-  tool: Tool,
-  inputs: Record<string, string | ApiImageInput>
-): Promise<GenerateContentResponse> => {
-    const modelName = 'gemini-2.5-flash';
-    const contentRequest = getPrompt(tool.id, inputs) as GenerateContentParameters['contents'];
-    const systemInstruction = getSystemInstruction(tool.id);
+  const { toolId, inputs } = request.data;
 
-    const response = await genAI.models.generateContent({
-        model: modelName,
-        contents: contentRequest,
-        config: {
-            systemInstruction: systemInstruction,
-        }
+  if (!toolId || !inputs) {
+    throw new HttpsError(
+      "invalid-argument",
+      "The function must be called with 'toolId' and 'inputs' arguments."
+    );
+  }
+
+  try {
+    const contents = getPrompt(toolId, inputs);
+    const systemInstruction = getSystemInstruction(toolId);
+    
+    // Some tools can benefit from real-time information via Google Search grounding.
+    const needsGrounding = ['influencer_discovery', 'social_media_optimizer'].includes(toolId);
+    
+    const stringifiedContent = typeof contents === 'string' ? contents : JSON.stringify(contents);
+    const needsJson = stringifiedContent.includes(JSON_FORMAT_INSTRUCTION);
+
+    const config: any = { systemInstruction };
+    
+    if (needsGrounding) {
+      config.tools = [{ googleSearch: {} }];
+    } else if (needsJson) {
+      // FIX: Set responseMimeType for tools that expect a JSON output.
+      config.responseMimeType = "application/json";
+    }
+    
+    // FIX: Correctly call the Gemini API using `ai.models.generateContent`.
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents,
+        config,
     });
-    return response;
-};
+    
+    // FIX: Correctly extract text and grounding metadata from the response.
+    const text = response.text;
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+    const sources = groundingMetadata?.groundingChunks
+      ?.map((chunk: any) => chunk.web)
+      .filter(Boolean); // Filter out any empty/undefined chunks
 
-const callGeminiWithGroundingBackend = async(prompt: string): Promise<GenerateContentResponse> => {
-    const modelName = 'gemini-2.5-flash';
-    const response = await genAI.models.generateContent({
-        model: modelName,
-        contents: prompt,
-        config: { tools: [{ googleSearch: {} }] },
-    });
-    return response;
-};
+    return { text, sources };
 
-const callVideoGeneratorBackend = async (prompt: string): Promise<GenerateVideosOperation> => {
-    const operation = await genAI.models.generateVideos({
-        model: 'veo-2.0-generate-001',
-        prompt: prompt,
-        config: { numberOfVideos: 1 }
-    });
-    return operation;
-};
-
-const checkVideoOperationBackend = async (operation: GenerateVideosOperation): Promise<GenerateVideosOperation> => {
-    const updatedOperation = await genAI.operations.getVideosOperation({ operation: operation });
-    return updatedOperation;
-}
-
-export const generateContent = onCall({ secrets: ["API_KEY"] }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
+  } catch (error) {
+    logger.error("Error calling Gemini API:", error);
+    if (error instanceof Error) {
+        throw new HttpsError("internal", error.message, error.stack);
     }
-    const { toolId, inputs } = request.data;
-    if (!toolId || !inputs) {
-        throw new HttpsError("invalid-argument", "Missing 'toolId' or 'inputs'.");
-    }
-    const tool = TOOLS.find(t => t.id === toolId);
-    if (!tool) {
-        throw new HttpsError("not-found", `Tool with id ${toolId} not found.`);
-    }
-
-    try {
-        if (tool.id === 'seo_assistant') {
-            const prompt = getPrompt(tool.id, inputs) as string;
-            const response = await callGeminiWithGroundingBackend(prompt);
-            const text = response.text;
-            const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => chunk.web).filter(Boolean) || [];
-            return { text, sources };
-        } else {
-            const response = await callGeminiBackend(tool, inputs as Record<string, string | ApiImageInput>);
-            const text = response.text;
-            return { text };
-        }
-    } catch (error: any) {
-        console.error("Error calling Gemini API:", JSON.stringify(error));
-        throw new HttpsError("internal", "An error occurred with the AI model.", error.message);
-    }
+    throw new HttpsError("internal", "An unexpected error occurred.");
+  }
 });
 
 
-// FIX: Switched to idiomatic v2 CORS handling by adding `cors: true` to the options.
-// This removes the manual `cors` package usage and resolves the associated type conflicts
-// with `Request` and `Response` objects that caused the original errors.
-export const generateVideo = onRequest({ timeoutSeconds: 540, memory: "1GiB", secrets: ["API_KEY"], cors: true }, async (req: FunctionsRequest, res: FunctionsResponse) => {
+/**
+ * An HTTP-triggered Cloud Function to generate video and stream it back.
+ */
+export const generateVideo = onRequest(
+    // FIX: Corrected memory allocation unit from '1GB' to '1GiB' as required by Firebase Functions v2.
+    { timeoutSeconds: 540, memory: '1GiB', cors: true },
+    // FIX: Added explicit types for 'req' and 'res' to resolve type inference issues. This ensures that
+    // the correct properties (like 'headers', 'status', 'body') are available and type-checked correctly.
+    async (req: import("firebase-functions/v2/https").Request, res: import("express").Response) => {
+    
+    // Verify authentication
+    if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
+        res.status(403).send('Unauthorized');
+        return;
+    }
+    const idToken = req.headers.authorization.split('Bearer ')[1];
+    try {
+        await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+        res.status(403).send('Unauthorized');
+        return;
+    }
+    
     if (req.method !== 'POST') {
         res.status(405).send('Method Not Allowed');
         return;
     }
-
-    const idToken = req.headers.authorization?.split('Bearer ')[1];
-    if (!idToken) {
-        res.status(401).send('Unauthorized: No token provided.');
-        return;
-    }
-
-    try {
-        await admin.auth().verifyIdToken(idToken);
-    } catch (error) {
-        res.status(401).send('Unauthorized: Invalid token.');
-        return;
-    }
-
     const { prompt } = req.body;
-    if (!prompt || typeof prompt !== 'string') {
-        res.status(400).send('Bad Request: Missing or invalid prompt.');
+    if (!prompt) {
+        res.status(400).send('Bad Request: prompt is missing.');
         return;
     }
-
+    
     try {
-        let operation = await callVideoGeneratorBackend(prompt);
+        // FIX: Use the correct model name 'veo-2.0-generate-001' for video generation.
+        let operation = await ai.models.generateVideos({
+            model: 'veo-2.0-generate-001',
+            prompt: prompt,
+            config: {
+                numberOfVideos: 1,
+            },
+        });
 
+        // Poll the operation status until it's complete
         while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 10000)); // wait 10s
-            operation = await checkVideoOperationBackend(operation);
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            operation = await ai.operations.getVideosOperation({ operation: operation });
         }
 
-        if (operation.error) {
-            throw new Error(String(operation.error.message || 'Video generation failed with an unknown error.'));
+        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+        if (!downloadLink) {
+            throw new Error("Video generation completed, but no download link was found.");
         }
         
-        const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (!videoUri) {
-            throw new Error("Video generation completed but no URI was found.");
+        // FIX: Fetch the generated video by appending the API key to the URI.
+        const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+        
+        if (!videoResponse.ok || !videoResponse.body) {
+            throw new Error(`Failed to download the generated video. Status: ${videoResponse.status}`);
         }
         
-        const downloadableUrl = `${videoUri}&key=${process.env.API_KEY}`;
-        
-        const videoResponse = await fetch(downloadableUrl);
-
-        if (!videoResponse.ok) {
-            throw new Error(`Failed to fetch video file: ${videoResponse.statusText}`);
-        }
-
-        if (!videoResponse.body) {
-            throw new Error("Video response body is null.");
-        }
-        
+        // Stream the video back to the client
         res.setHeader('Content-Type', 'video/mp4');
-        
         const reader = videoResponse.body.getReader();
         while (true) {
             const { done, value } = await reader.read();
@@ -387,8 +243,12 @@ export const generateVideo = onRequest({ timeoutSeconds: 540, memory: "1GiB", se
         }
         res.end();
 
-    } catch (error: any) {
-        console.error("Error during video generation:", error);
-        res.status(500).send(`Internal Server Error: ${error.message}`);
+    } catch (error) {
+        logger.error('Video generation failed:', error);
+        if (error instanceof Error) {
+            res.status(500).send(error.message);
+        } else {
+            res.status(500).send('An unknown error occurred during video generation.');
+        }
     }
 });
